@@ -1,66 +1,56 @@
-import Image from "next/image";
-import styles from "./page.module.css";
+import Link from "next/link";
+import { SignInButton, SignUpButton, Show, UserButton } from "@clerk/nextjs";
 
 export default function Home() {
   return (
-    <div className={styles.page}>
-      <main className={styles.main}>
-        <Image
-          className={styles.logo}
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className={styles.intro}>
-          <h1>To get started, edit the page.tsx file.</h1>
-          <p>
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+    <div
+      style={{
+        display: "flex",
+        minHeight: "100vh",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: "1.5rem",
+        padding: "2rem",
+        textAlign: "center",
+      }}
+    >
+      <h1 style={{ fontSize: "2rem", fontWeight: 600 }}>Email Optimizer</h1>
+      <p style={{ maxWidth: 480, opacity: 0.8 }}>
+        Connect your inboxes over IMAP and bulk-filter spam across all of them
+        from one dashboard.
+      </p>
+
+      <Show when="signed-out">
+        <div style={{ display: "flex", gap: "0.75rem" }}>
+          <SignInButton>
+            <button style={buttonStyle}>Sign in</button>
+          </SignInButton>
+          <SignUpButton>
+            <button style={buttonStyle}>Sign up</button>
+          </SignUpButton>
         </div>
-        <div className={styles.ctas}>
-          <a
-            className={styles.primary}
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className={styles.logo}
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className={styles.secondary}
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+      </Show>
+
+      <Show when="signed-in">
+        <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
+          <Link href="/dashboard" style={buttonStyle}>
+            Go to dashboard
+          </Link>
+          <UserButton />
         </div>
-      </main>
+      </Show>
     </div>
   );
 }
+
+const buttonStyle: React.CSSProperties = {
+  padding: "0.5rem 1.25rem",
+  borderRadius: 6,
+  border: "1px solid currentColor",
+  background: "transparent",
+  color: "inherit",
+  cursor: "pointer",
+  textDecoration: "none",
+  fontSize: "0.95rem",
+};
