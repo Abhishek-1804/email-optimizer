@@ -42,3 +42,6 @@ next-env.d.ts
 
 # local sqlite db
 /data/
+
+# self-contained toolchain (downloaded by `just install-deps`)
+/bin/

@@ -4,6 +4,8 @@ import { auth } from "@clerk/nextjs/server";
 import { revalidatePath } from "next/cache";
 import db from "@/lib/db";
 import { encrypt, decrypt } from "@/lib/crypto";
+import { fetchRecentMessages, type InboxMessage } from "@/lib/imap";
+export type { InboxMessage } from "@/lib/imap";
 
 export type EmailAccount = {
   id: number;
@@ -58,6 +60,34 @@ export async function getDecryptedAppPassword(accountId: number): Promise<string
     .get(accountId, userId) as { app_password: string } | undefined;
 
   return row ? decrypt(row.app_password) : null;
+}
+
+export async function previewInbox(accountId: number): Promise<InboxMessage[]> {
+  const { userId } = await auth();
+  if (!userId) throw new Error("Not authenticated");
+
+  const row = db
+    .prepare(
+      `SELECT email, imap_host, imap_port, app_password
+       FROM email_accounts WHERE id = ? AND clerk_user_id = ?`
+    )
+    .get(accountId, userId) as
+    | { email: string; imap_host: string; imap_port: number; app_password: string }
+    | undefined;
+
+  if (!row) throw new Error("Account not found");
+
+  try {
+    return await fetchRecentMessages({
+      email: row.email,
+      imap_host: row.imap_host,
+      imap_port: row.imap_port,
+      appPassword: decrypt(row.app_password),
+    });
+  } catch (err) {
+    console.error(`IMAP preview failed for account ${accountId}:`, err);
+    throw new Error("Could not connect to this mailbox. Check the app password and host/port.");
+  }
 }
 
 export async function removeEmailAccount(formData: FormData) {

@@ -1,6 +1,7 @@
 import { UserButton } from "@clerk/nextjs";
 import { listEmailAccounts, removeEmailAccount } from "./actions";
 import AddAccountForm from "./AddAccountForm";
+import PreviewInbox from "./PreviewInbox";
 
 export default async function DashboardPage() {
   const accounts = await listEmailAccounts();
@@ -31,24 +32,24 @@ export default async function DashboardPage() {
                   border: "1px solid #ccc3",
                   borderRadius: 8,
                   padding: "0.75rem 1rem",
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
                 }}
               >
-                <div>
-                  <div style={{ fontWeight: 500 }}>{account.email}</div>
-                  <div style={{ fontSize: "0.85rem", opacity: 0.7 }}>
-                    {account.label ? `${account.label} · ` : ""}
-                    {account.imap_host}:{account.imap_port}
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <div>
+                    <div style={{ fontWeight: 500 }}>{account.email}</div>
+                    <div style={{ fontSize: "0.85rem", opacity: 0.7 }}>
+                      {account.label ? `${account.label} · ` : ""}
+                      {account.imap_host}:{account.imap_port}
+                    </div>
                   </div>
+                  <form action={removeEmailAccount}>
+                    <input type="hidden" name="id" value={account.id} />
+                    <button type="submit" style={{ border: "none", background: "none", cursor: "pointer", opacity: 0.6 }}>
+                      Remove
+                    </button>
+                  </form>
                 </div>
-                <form action={removeEmailAccount}>
-                  <input type="hidden" name="id" value={account.id} />
-                  <button type="submit" style={{ border: "none", background: "none", cursor: "pointer", opacity: 0.6 }}>
-                    Remove
-                  </button>
-                </form>
+                <PreviewInbox accountId={account.id} />
               </li>
             ))}
           </ul>
