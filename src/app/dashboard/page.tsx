@@ -7,7 +7,7 @@ export default async function DashboardPage() {
   const accounts = await listEmailAccounts();
 
   return (
-    <div className="mx-auto max-w-2xl p-8">
+    <div className="mx-auto max-w-5xl p-8">
       <header className="mb-8 flex items-center justify-between">
         <h1 className="text-2xl font-semibold">Your accounts</h1>
         <UserButton />
