@@ -22,44 +22,27 @@ export default function PreviewInbox({ accountId }: { accountId: number }) {
   }
 
   return (
-    <div style={{ marginTop: "0.5rem" }}>
+    <div className="mt-2">
       <button
         type="button"
         onClick={handlePreview}
         disabled={isPending}
-        style={{
-          border: "none",
-          background: "none",
-          cursor: isPending ? "default" : "pointer",
-          opacity: isPending ? 0.6 : 0.8,
-          fontSize: "0.85rem",
-          padding: 0,
-          textDecoration: "underline",
-        }}
+        className="rounded-md border border-gray-300 px-3 py-1.5 text-sm hover:bg-gray-100 disabled:opacity-60"
       >
         {isPending ? "Connecting..." : "Preview inbox"}
       </button>
 
-      {error && <p style={{ color: "#e5484d", fontSize: "0.85rem", marginTop: "0.4rem" }}>{error}</p>}
+      {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
 
       {messages && (
-        <ul
-          style={{
-            listStyle: "none",
-            padding: 0,
-            marginTop: "0.5rem",
-            display: "flex",
-            flexDirection: "column",
-            gap: "0.4rem",
-          }}
-        >
+        <ul className="mt-2 flex flex-col gap-1.5">
           {messages.length === 0 ? (
-            <li style={{ fontSize: "0.85rem", opacity: 0.6 }}>Inbox is empty.</li>
+            <li className="text-sm text-gray-500">Inbox is empty.</li>
           ) : (
             messages.map((msg) => (
-              <li key={msg.uid} style={{ fontSize: "0.85rem", borderLeft: "2px solid #ccc6", paddingLeft: "0.5rem" }}>
-                <div style={{ fontWeight: 500 }}>{msg.subject}</div>
-                <div style={{ opacity: 0.65 }}>
+              <li key={msg.uid} className="border-l-2 border-gray-200 pl-2 text-sm">
+                <div className="font-medium">{msg.subject}</div>
+                <div className="text-gray-500">
                   {msg.from}
                   {msg.date ? ` · ${new Date(msg.date).toLocaleString()}` : ""}
                 </div>

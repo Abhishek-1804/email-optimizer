@@ -7,44 +7,36 @@ export default async function DashboardPage() {
   const accounts = await listEmailAccounts();
 
   return (
-    <div style={{ maxWidth: 640, margin: "0 auto", padding: "2rem" }}>
-      <header
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          marginBottom: "2rem",
-        }}
-      >
-        <h1 style={{ fontSize: "1.5rem", fontWeight: 600 }}>Your accounts</h1>
+    <div className="mx-auto max-w-2xl p-8">
+      <header className="mb-8 flex items-center justify-between">
+        <h1 className="text-2xl font-semibold">Your accounts</h1>
         <UserButton />
       </header>
 
-      <section style={{ marginBottom: "2rem" }}>
+      <section className="mb-8">
         {accounts.length === 0 ? (
-          <p style={{ opacity: 0.7 }}>No email accounts connected yet.</p>
+          <p className="text-gray-500">No email accounts connected yet.</p>
         ) : (
-          <ul style={{ listStyle: "none", padding: 0, display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+          <ul className="flex flex-col gap-3">
             {accounts.map((account) => (
               <li
                 key={account.id}
-                style={{
-                  border: "1px solid #ccc3",
-                  borderRadius: 8,
-                  padding: "0.75rem 1rem",
-                }}
+                className="rounded-lg border border-gray-200 bg-white p-4"
               >
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <div className="flex items-center justify-between">
                   <div>
-                    <div style={{ fontWeight: 500 }}>{account.email}</div>
-                    <div style={{ fontSize: "0.85rem", opacity: 0.7 }}>
+                    <div className="font-medium">{account.email}</div>
+                    <div className="text-sm text-gray-500">
                       {account.label ? `${account.label} · ` : ""}
                       {account.imap_host}:{account.imap_port}
                     </div>
                   </div>
                   <form action={removeEmailAccount}>
                     <input type="hidden" name="id" value={account.id} />
-                    <button type="submit" style={{ border: "none", background: "none", cursor: "pointer", opacity: 0.6 }}>
+                    <button
+                      type="submit"
+                      className="rounded-md border border-red-300 px-3 py-1.5 text-sm text-red-600 hover:bg-red-50"
+                    >
                       Remove
                     </button>
                   </form>
@@ -57,9 +49,7 @@ export default async function DashboardPage() {
       </section>
 
       <section>
-        <h2 style={{ fontSize: "1.1rem", fontWeight: 600, marginBottom: "0.75rem" }}>
-          Add an account
-        </h2>
+        <h2 className="mb-3 text-lg font-semibold">Add an account</h2>
         <AddAccountForm />
       </section>
     </div>

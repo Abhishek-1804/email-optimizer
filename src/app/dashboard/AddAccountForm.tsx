@@ -3,6 +3,9 @@
 import { useRef, useState, useTransition } from "react";
 import { addEmailAccount } from "./actions";
 
+const inputClass =
+  "rounded-md border border-gray-300 bg-white px-3 py-2 text-sm focus:border-gray-500 focus:outline-none";
+
 export default function AddAccountForm() {
   const formRef = useRef<HTMLFormElement>(null);
   const [isPending, startTransition] = useTransition();
@@ -22,37 +25,35 @@ export default function AddAccountForm() {
           }
         });
       }}
-      style={{ display: "flex", flexDirection: "column", gap: "0.6rem", maxWidth: 360 }}
+      className="flex max-w-sm flex-col gap-2.5"
     >
-      <input name="email" type="email" placeholder="you@gmail.com" required style={inputStyle} />
+      <input name="email" type="email" placeholder="you@gmail.com" required className={inputClass} />
       <input
         name="appPassword"
         type="password"
         placeholder="Gmail app password"
         required
-        style={inputStyle}
+        className={inputClass}
       />
-      <input name="label" type="text" placeholder="Label (optional)" style={inputStyle} />
+      <input name="label" type="text" placeholder="Label (optional)" className={inputClass} />
 
-      {error && <p style={{ color: "#e5484d", fontSize: "0.85rem" }}>{error}</p>}
+      {error && <p className="text-sm text-red-600">{error}</p>}
 
       <button
         type="submit"
         disabled={isPending}
-        style={{
-          padding: "0.5rem 1rem",
-          borderRadius: 6,
-          border: "1px solid currentColor",
-          background: "transparent",
-          cursor: isPending ? "default" : "pointer",
-          opacity: isPending ? 0.6 : 1,
-        }}
+        className="rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700 disabled:opacity-60"
       >
         {isPending ? "Adding..." : "Add account"}
       </button>
-      <p style={{ fontSize: "0.8rem", opacity: 0.6 }}>
+      <p className="text-xs text-gray-500">
         Use a Gmail{" "}
-        <a href="https://myaccount.google.com/apppasswords" target="_blank" rel="noopener noreferrer">
+        <a
+          href="https://myaccount.google.com/apppasswords"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="underline"
+        >
           app password
         </a>
         , not your regular password.
@@ -60,11 +61,3 @@ export default function AddAccountForm() {
     </form>
   );
 }
-
-const inputStyle: React.CSSProperties = {
-  padding: "0.5rem 0.75rem",
-  borderRadius: 6,
-  border: "1px solid #ccc6",
-  background: "transparent",
-  color: "inherit",
-};

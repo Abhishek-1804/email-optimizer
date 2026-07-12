@@ -3,38 +3,34 @@ import { SignInButton, SignUpButton, Show, UserButton } from "@clerk/nextjs";
 
 export default function Home() {
   return (
-    <div
-      style={{
-        display: "flex",
-        minHeight: "100vh",
-        flexDirection: "column",
-        alignItems: "center",
-        justifyContent: "center",
-        gap: "1.5rem",
-        padding: "2rem",
-        textAlign: "center",
-      }}
-    >
-      <h1 style={{ fontSize: "2rem", fontWeight: 600 }}>Email Optimizer</h1>
-      <p style={{ maxWidth: 480, opacity: 0.8 }}>
+    <div className="flex min-h-screen flex-col items-center justify-center gap-6 p-8 text-center">
+      <h1 className="text-3xl font-semibold">Email Optimizer</h1>
+      <p className="max-w-md text-gray-600">
         Connect your inboxes over IMAP and bulk-filter spam across all of them
         from one dashboard.
       </p>
 
       <Show when="signed-out">
-        <div style={{ display: "flex", gap: "0.75rem" }}>
+        <div className="flex gap-3">
           <SignInButton>
-            <button style={buttonStyle}>Sign in</button>
+            <button className="rounded-md bg-gray-900 px-5 py-2 text-sm font-medium text-white hover:bg-gray-700">
+              Sign in
+            </button>
           </SignInButton>
           <SignUpButton>
-            <button style={buttonStyle}>Sign up</button>
+            <button className="rounded-md border border-gray-300 bg-white px-5 py-2 text-sm font-medium hover:bg-gray-100">
+              Sign up
+            </button>
           </SignUpButton>
         </div>
       </Show>
 
       <Show when="signed-in">
-        <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
-          <Link href="/dashboard" style={buttonStyle}>
+        <div className="flex items-center gap-4">
+          <Link
+            href="/dashboard"
+            className="rounded-md bg-gray-900 px-5 py-2 text-sm font-medium text-white hover:bg-gray-700"
+          >
             Go to dashboard
           </Link>
           <UserButton />
@@ -43,14 +39,3 @@ export default function Home() {
     </div>
   );
 }
-
-const buttonStyle: React.CSSProperties = {
-  padding: "0.5rem 1.25rem",
-  borderRadius: 6,
-  border: "1px solid currentColor",
-  background: "transparent",
-  color: "inherit",
-  cursor: "pointer",
-  textDecoration: "none",
-  fontSize: "0.95rem",
-};
