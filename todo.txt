@@ -1,8 +1,7 @@
-sql schema in db/schemas dir - done (db/schemas/001_init.sql, email_accounts table)
-basic clerk login - done (sign-in/sign-up pages, proxy.ts protects /dashboard)
-
 next up:
 - real IMAP connection test when adding an account
-- encrypt app_password at rest instead of storing plaintext
 - spam filtering: manual block-list + List-Unsubscribe header detection
 - allow multiple accounts per user in dashboard UI polish
+
+done:
+- encrypt app_password at rest (AES-256-GCM, src/lib/crypto.ts, key in APP_PASSWORD_ENCRYPTION_KEY)
