@@ -1,36 +1,104 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Email Optimizer
 
-## Getting Started
+A multi-account email client for **bulk spam filtering**. Connect several
+mailboxes over IMAP (Gmail first) and clean them up from one dashboard,
+instead of unsubscribing and deleting inbox-by-inbox.
 
-First, run the development server:
+Two filtering approaches are planned:
+
+1. **Manual block-list** — you curate a list of senders/patterns to filter.
+2. **Header-based suggestions** — detect `List-Unsubscribe` (and similar)
+   headers to surface what's safe to bulk-filter automatically.
+
+> **Status: v0.** The foundations are in place (auth, multi-account storage,
+> IMAP connectivity). The spam-filtering logic itself is not built yet — see
+> [Roadmap](#roadmap).
+
+## What works today
+
+- **Auth** — sign in / sign up via [Clerk](https://clerk.com).
+- **Multiple accounts** — add and remove IMAP mailboxes from the dashboard.
+  Your Clerk login is separate from the mailboxes you connect: one account
+  can hold many mailboxes, and the email you log in with is not auto-added.
+- **Credentials encrypted at rest** — app passwords are stored with
+  AES-256-GCM (never plaintext, never sent back to the browser).
+- **Inbox preview** — fetch the latest 10 messages from an account to confirm
+  the IMAP connection works.
+
+## Tech stack
+
+- [Next.js 16](https://nextjs.org) (App Router) + React 19
+- [Clerk](https://clerk.com) for authentication
+- [imapflow](https://imapflow.com) for IMAP
+- [better-sqlite3](https://github.com/WiseLibs/better-sqlite3) for local storage
+- [Tailwind CSS v4](https://tailwindcss.com) for styling
+
+## Getting started
+
+This project is **self-contained**: the only tool you need preinstalled is
+[`just`](https://github.com/casey/just). It downloads Node.js and the sqlite3
+CLI (checksum-verified) into `bin/`, so nothing pollutes your system.
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+just dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+That downloads the toolchain, installs dependencies, and starts the dev
+server at [http://localhost:3000](http://localhost:3000).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### Environment variables
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Create a `.env.local` (git-ignored) with:
 
-## Learn More
+```bash
+# From `clerk init` / your Clerk dashboard
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_...
+CLERK_SECRET_KEY=sk_test_...
 
-To learn more about Next.js, take a look at the following resources:
+# 32 random bytes, base64. Generate with:
+#   node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
+APP_PASSWORD_ENCRYPTION_KEY=...
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+### Connecting a Gmail account
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Gmail requires an **app password** for IMAP — your regular password will be
+rejected. Enable 2-Step Verification, then generate a 16-character app
+password at <https://myaccount.google.com/apppasswords> and use that when
+adding the account.
 
-## Deploy on Vercel
+## Commands (`just`)
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+| Command | Description |
+| --- | --- |
+| `just dev` | Install toolchain + deps, run the dev server |
+| `just build` | Production build |
+| `just lint` | ESLint (flat config) |
+| `just install-deps` | Download Node.js + sqlite3 into `bin/`, then `npm install` |
+| `just clean` | Remove `node_modules`, lockfile, build output, local db |
+| `just clean-bin` | Wipe the downloaded toolchain in `bin/` |
+| `just sync-agent-files` | Copy `CLAUDE.md` to the other agent-config filenames |
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Project layout
+
+```
+src/app/                 App Router pages
+  page.tsx               Landing page
+  dashboard/             Account management + inbox preview (protected)
+  sign-in, sign-up/      Clerk auth pages
+src/lib/
+  db.ts                  SQLite connection
+  crypto.ts              AES-256-GCM encrypt/decrypt for app passwords
+  imap.ts                IMAP fetch via imapflow
+src/proxy.ts             Clerk middleware (protects /dashboard)
+db/schemas/              SQL schema
+hack/install-deps.sh     Toolchain bootstrap
+```
+
+## Roadmap
+
+- Manual block-list to filter chosen senders across all accounts
+- `List-Unsubscribe` header detection to suggest bulk-filter candidates
+- Incremental IMAP sync (track last-seen UID) instead of re-fetching
+- OAuth for mailbox connections (replacing app passwords)
+- Encrypt with a rotatable key / move off local SQLite for real deployments
