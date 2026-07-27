@@ -1,4 +1,12 @@
 next up:
-- spam filtering: manual block-list + List-Unsubscribe header detection
+- classifier: score the signals in src/lib/signals.ts, fill messages.category + bulk_score
+- grouping: fill messages.group_key (List-Id > DKIM d= > From org domain), group view on dashboard
+- bulk delete, once grouping is trusted. destructive, real mailboxes — gate it hard
+- manual block-list to complement the header signals
 - allow multiple accounts per user in dashboard UI polish
-- incremental IMAP sync (track last-seen UID) instead of full refetch every preview
+- sync deletions: messages removed on the server still linger in the local cache
+- move the full-mailbox sync off the request path (it runs inside a server action today)
+
+done:
+- incremental IMAP sync (tracks last-seen UID + UIDVALIDITY in mailbox_sync)
+- local message cache in sqlite (metadata + signals; bodies as a separate pass)

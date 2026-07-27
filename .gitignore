@@ -1,47 +1,28 @@
-# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+/*
 
-# dependencies
-/node_modules
-/.pnp
-.pnp.*
-.yarn/*
-!.yarn/patches
-!.yarn/plugins
-!.yarn/releases
-!.yarn/versions
+# Source, schema, tooling scripts
+!/src
+!/public
+!/db
+!/hack
 
-# testing
-/coverage
+# Build and toolchain config
+!/justfile
+!/package.json
+!/package-lock.json
+!/tsconfig.json
+!/next.config.ts
+!/postcss.config.mjs
+!/eslint.config.mjs
 
-# next.js
-/.next/
-/out/
+# Docs and meta
+!/.gitignore
+!/README.md
+!/CLAUDE.md
+!/todo.txt
 
-# production
-/build
-
-# misc
+# Junk that can turn up anywhere inside the directories above. Deliberately
+# unanchored — these need to match at any depth, not just the root.
 .DS_Store
 *.pem
-
-# debug
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-.pnpm-debug.log*
-
-# env files (can opt-in for committing if needed)
-.env*
-
-# vercel
-.vercel
-
-# typescript
 *.tsbuildinfo
-next-env.d.ts
-
-# local sqlite db
-/data/
-
-# self-contained toolchain (downloaded by `just install-deps`)
-/bin/
