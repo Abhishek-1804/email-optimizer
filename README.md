@@ -10,9 +10,11 @@ Two filtering approaches are planned:
 2. **Header-based suggestions** — detect `List-Unsubscribe` (and similar)
    headers to surface what's safe to bulk-filter automatically.
 
-> **Status: v0.** The foundations are in place (auth, multi-account storage,
-> IMAP connectivity). The spam-filtering logic itself is not built yet — see
-> [Roadmap](#roadmap).
+> **Status: v0, deliberately reset.** Auth, multi-account storage and the IMAP
+> client are in place. A first pass at message sync and grouping was built and
+> then removed — it outgrew its structure. It is being rebuilt feature by
+> feature against the conventions in [CONTRIBUTING.md](CONTRIBUTING.md); the
+> notes from the first attempt are in `todo.txt`.
 
 ## What works today
 
@@ -22,8 +24,9 @@ Two filtering approaches are planned:
   can hold many mailboxes, and the email you log in with is not auto-added.
 - **Credentials encrypted at rest** — app passwords are stored with
   AES-256-GCM (never plaintext, never sent back to the browser).
-- **Inbox preview** — fetch the latest 10 messages from an account to confirm
-  the IMAP connection works.
+- **Read-only IMAP by construction** — mailboxes are opened with `EXAMINE`, so
+  the server refuses writes at the protocol level. Nothing in this codebase can
+  modify or delete mail.
 
 ## Tech stack
 
@@ -84,16 +87,20 @@ adding the account.
 ```
 src/app/                 App Router pages
   page.tsx               Landing page
-  dashboard/             Account management + inbox preview (protected)
+  dashboard/             Account management (protected)
   sign-in, sign-up/      Clerk auth pages
 src/lib/
-  db.ts                  SQLite connection
+  db.ts                  SQLite connection, applies db/schemas/*.sql
   crypto.ts              AES-256-GCM encrypt/decrypt for app passwords
-  imap.ts                IMAP fetch via imapflow
+  imap.ts                IMAP client factory + read-only mailbox wrapper
 src/proxy.ts             Clerk middleware (protects /dashboard)
-db/schemas/              SQL schema
+db/schemas/              SQL schema, numbered and idempotent
 hack/install-deps.sh     Toolchain bootstrap
 ```
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for where new code goes as this grows —
+the feature-folder layout, the one-directional import rule, and the safety
+constraints that apply because these are real mailboxes.
 
 ## Roadmap
 

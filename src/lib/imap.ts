@@ -1,21 +1,4 @@
 import { ImapFlow } from "imapflow";
-import { simpleParser } from "mailparser";
-
-export type InboxMessage = {
-  uid: number;
-  subject: string;
-  from: string;
-  date: string | null;
-};
-
-export type MessageDetail = {
-  uid: number;
-  subject: string;
-  from: string;
-  to: string;
-  date: string | null;
-  text: string;
-};
 
 export type ImapAccount = {
   imap_host: string;
@@ -31,6 +14,10 @@ export type MailboxState = {
   exists: number;
 };
 
+/**
+ * Deliberately not exported. Every mailbox is opened through `withMailbox`, so
+ * there is exactly one place that can choose EXAMINE vs SELECT — see below.
+ */
 function createClient(account: ImapAccount): ImapFlow {
   return new ImapFlow({
     host: account.imap_host,
@@ -45,7 +32,11 @@ function createClient(account: ImapAccount): ImapFlow {
  * Connects, opens a mailbox read-only, runs `fn`, then always disconnects.
  *
  * `readOnly` makes the server issue EXAMINE rather than SELECT, so writes are
- * refused at the protocol level rather than merely never attempted.
+ * refused at the protocol level rather than merely never attempted. IMAP has no
+ * connection-wide read-only mode, so this is the narrowest place the guarantee
+ * can live.
+ *
+ * No callers yet — this is the seed the next mail feature builds on.
  */
 export async function withMailbox<T>(
   account: ImapAccount,
@@ -72,66 +63,4 @@ export async function withMailbox<T>(
   } finally {
     await client.logout();
   }
-}
-
-/** Fetches the most recent `limit` messages from INBOX, newest first. */
-export async function fetchRecentMessages(
-  account: ImapAccount,
-  limit = 10
-): Promise<InboxMessage[]> {
-  return withMailbox(account, "INBOX", async (client, state) => {
-    if (state.exists === 0) return [];
-
-    const start = Math.max(1, state.exists - limit + 1);
-    const messages: InboxMessage[] = [];
-
-    for await (const msg of client.fetch(`${start}:${state.exists}`, {
-      envelope: true,
-      uid: true,
-    })) {
-      messages.push({
-        uid: msg.uid,
-        subject: msg.envelope?.subject ?? "(no subject)",
-        from: msg.envelope?.from?.[0]?.address ?? "(unknown sender)",
-        date: msg.envelope?.date ? new Date(msg.envelope.date).toISOString() : null,
-      });
-    }
-
-    return messages.reverse();
-  });
-}
-
-/** Fetches and parses the full body of a single INBOX message by UID. */
-export async function fetchMessageBody(
-  account: ImapAccount,
-  uid: number
-): Promise<MessageDetail> {
-  return withMailbox(account, "INBOX", async (client) => {
-    const msg = await client.fetchOne(String(uid), { source: true }, { uid: true });
-    if (!msg || !msg.source) throw new Error("Message not found");
-
-    const parsed = await simpleParser(msg.source);
-    const text = parsed.text ?? (parsed.html ? htmlToText(parsed.html) : "");
-
-    return {
-      uid,
-      subject: parsed.subject ?? "(no subject)",
-      from: parsed.from?.text ?? "(unknown sender)",
-      to: Array.isArray(parsed.to)
-        ? parsed.to.map((a) => a.text).join(", ")
-        : parsed.to?.text ?? "",
-      date: parsed.date ? parsed.date.toISOString() : null,
-      text: text.trim() || "(no text content)",
-    };
-  });
-}
-
-/** Minimal HTML→text fallback for emails that only ship an HTML part. */
-export function htmlToText(html: string): string {
-  return html
-    .replace(/<style[\s\S]*?<\/style>/gi, "")
-    .replace(/<script[\s\S]*?<\/script>/gi, "")
-    .replace(/<[^>]+>/g, "")
-    .replace(/&nbsp;/g, " ")
-    .replace(/\n{3,}/g, "\n\n");
 }

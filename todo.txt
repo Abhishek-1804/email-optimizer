@@ -1,12 +1,85 @@
-next up:
-- classifier: score the signals in src/lib/signals.ts, fill messages.category + bulk_score
-- grouping: fill messages.group_key (List-Id > DKIM d= > From org domain), group view on dashboard
-- bulk delete, once grouping is trusted. destructive, real mailboxes — gate it hard
-- manual block-list to complement the header signals
-- allow multiple accounts per user in dashboard UI polish
-- sync deletions: messages removed on the server still linger in the local cache
-- move the full-mailbox sync off the request path (it runs inside a server action today)
+Everything below "removed in the reset" was built and then deleted to get back to
+a small, well-structured base. It is not lost — `git show 81ce1b2` has all of it,
+and the notes here are what the code cost to work out the first time.
 
-done:
-- incremental IMAP sync (tracks last-seen UID + UIDVALIDITY in mailbox_sync)
-- local message cache in sqlite (metadata + signals; bodies as a separate pass)
+Rebuild in feature-sized slices, following CONTRIBUTING.md.
+
+
+removed in the reset (rebuild in roughly this order):
+
+- inbox preview: fetch the latest N messages from INBOX, master-detail reading
+  pane. Layout needs min-h-0 on both grid columns or the panes refuse to shrink
+  and overflow-y-auto silently does nothing.
+  was: src/lib/imap.ts fetchRecentMessages/fetchMessageBody,
+       src/app/dashboard/PreviewInbox.tsx
+
+- IMAP error mapping: imapflow sets `authenticationFailed` and carries the
+  server's own explanation in `responseText`. Surface it — for Gmail it names
+  the real cause ("Application-specific password required"), and a generic
+  "check your settings" message hides that completely. Also map ENOTFOUND /
+  ECONNREFUSED / ETIMEDOUT separately.
+  was: imapError() in src/app/dashboard/actions.ts
+
+- bulk-mail signal tables: the header names that identify graymail, grouped by
+  what they mean (list headers, automation, ESP fingerprints, campaign ids,
+  auth results, spam verdicts, human-mail markers). Derive the IMAP fetch list
+  from the tables so the query can never drift from them.
+  was: src/lib/signals.ts
+
+- header parsing: RFC 5322 unfolding of continuation lines, collecting repeated
+  headers, extracting the DKIM `d=` domain, normalizing List-Id.
+  was: src/lib/headers.ts
+
+- local message cache in sqlite: messages + mailbox_sync tables, metadata and
+  grouping signals in pass 1, bodies in a separate bounded pass. Keep the raw
+  header block so the classifier can be rewritten and re-run offline without
+  another IMAP round trip. Upsert must not clobber body_text/group_key/category.
+  was: db/schemas/002_messages.sql, src/lib/sync.ts
+
+- incremental sync: track last-seen UID per mailbox, keyed by UIDVALIDITY —
+  UIDs are only meaningful within a generation, so a UIDVALIDITY change
+  invalidates the whole cache. Watch the `UID FETCH n:*` quirk: it always
+  returns the last message even when n is past the highest UID, so skip
+  anything with uid <= sinceUid.
+  was: src/lib/imap-sync.ts
+
+- body download: resolve BODYSTRUCTURE to the text part only so attachments
+  stay on the server. Cap both the fetch and the stored text. Needs an
+  HTML→text fallback for mail that ships no text/plain part.
+  was: pickTextPart/downloadTextPart in src/lib/imap-sync.ts
+
+
+never built, still the point of the project:
+
+- classifier: score the signals, fill category + bulk_score
+- grouping: fill group_key (List-Id > DKIM d= > From org domain), grouped view
+  on the dashboard. ESP shared domains over-merge — watch for it.
+- bulk delete, once grouping is trusted. destructive, real mailboxes — gate it
+  hard. Everything today is read-only (EXAMINE, not SELECT); that stops being
+  true the moment this lands, so it needs its own read-write helper rather than
+  loosening withMailbox.
+- manual block-list to complement the header signals
+- sync deletions: messages removed on the server linger in the local cache
+- move full-mailbox sync off the request path (it ran inside a server action)
+- multi-account dashboard polish
+- OAuth for mailbox connections, replacing app passwords
+
+
+infrastructure notes:
+
+- bug: hack/install-deps.sh leaves better-sqlite3 compiled against the wrong
+  Node. Its prebuilt binary comes down for NODE_MODULE_VERSION 115 (system node
+  v18) while bin/node is v26 / MODULE_VERSION 147, so `just build` dies with
+  ERR_DLOPEN_FAILED on /dashboard. Workaround is `npm rebuild better-sqlite3`
+  with bin/ on PATH; the script should either force a source build or run that
+  rebuild itself after npm install.
+
+- postcss.config.mjs is load-bearing and fails silently: remove it and the
+  build still reports success, but Tailwind emits an empty stylesheet (10,153
+  bytes -> 1) and the whole app renders unstyled. Worth a smoke test that
+  asserts the built CSS is non-trivial.
+
+- test data: no good public dummy IMAP account with realistic bulk mail. Worth
+  building hack/seed-testmail.sh (local Dovecot or GreenMail) plus a labeled
+  synthetic message generator, so grouping and eventually delete can be tested
+  without touching a real mailbox.

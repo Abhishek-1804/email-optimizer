@@ -1,7 +1,6 @@
 import { UserButton } from "@clerk/nextjs";
 import { listEmailAccounts, removeEmailAccount } from "./actions";
 import AddAccountForm from "./AddAccountForm";
-import PreviewInbox from "./PreviewInbox";
 
 export default async function DashboardPage() {
   const accounts = await listEmailAccounts();
@@ -41,7 +40,6 @@ export default async function DashboardPage() {
                     </button>
                   </form>
                 </div>
-                <PreviewInbox accountId={account.id} />
               </li>
             ))}
           </ul>

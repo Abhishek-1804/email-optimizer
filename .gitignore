@@ -1,28 +1,37 @@
-/*
+# Dependencies
+/node_modules
 
-# Source, schema, tooling scripts
-!/src
-!/public
-!/db
-!/hack
+# Self-contained toolchain downloaded by hack/install-deps.sh
+/bin
 
-# Build and toolchain config
-!/justfile
-!/package.json
-!/package-lock.json
-!/tsconfig.json
-!/next.config.ts
-!/postcss.config.mjs
-!/eslint.config.mjs
+# Build output
+/.next
+/out
+/build
+next-env.d.ts
+*.tsbuildinfo
 
-# Docs and meta
-!/.gitignore
-!/README.md
-!/CLAUDE.md
-!/todo.txt
+# Local SQLite database. Holds encrypted IMAP app passwords and cached mail —
+# never commit it. `just clean` removes it.
+/data
 
-# Junk that can turn up anywhere inside the directories above. Deliberately
-# unanchored — these need to match at any depth, not just the root.
+# Secrets
+.env*
+!.env.example
+
+# Logs
+*.log
+npm-debug.log*
+
+# Test coverage
+/coverage
+
+# Deployment
+/.vercel
+
+# Editors and OS junk. Deliberately unanchored — these turn up at any depth.
+.idea/
+.vscode/
 .DS_Store
 *.pem
-*.tsbuildinfo
+*.swp
