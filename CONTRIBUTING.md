@@ -14,6 +14,38 @@ it are in `todo.txt`.
 
 ---
 
+## The tools
+
+| Tool | Used for | Notes |
+| --- | --- | --- |
+| [Next.js 16](https://nextjs.org) (App Router) + React 19 | Framework | Server components by default. `params` and `searchParams` are Promises — `await` them. |
+| [Clerk](https://clerk.com) | Auth | `src/proxy.ts` protects `/dashboard`. Every server action re-checks `auth()` — middleware is not authorization. |
+| [better-sqlite3](https://github.com/WiseLibs/better-sqlite3) | SQLite | **Synchronous** — no `await` on queries. That's the reason we're not on an async ORM. |
+| [imapflow](https://imapflow.com) | IMAP | Wrapped by `src/lib/imap.ts`, which is the only place a mailbox is opened. |
+| [mailparser](https://nodemailer.com/extras/mailparser/) | MIME parsing | Email is a swamp of encodings and multipart nesting. Never hand-parse it. |
+| [Tailwind v4](https://tailwindcss.com) | Styling | Configured via `postcss.config.mjs` — remove that file and the build still passes while emitting an empty stylesheet. |
+| [clsx](https://github.com/lukeed/clsx) + [tailwind-merge](https://github.com/dcastil/tailwind-merge) | `src/utils/cn.ts` | `twMerge` resolves conflicting utilities so a `className` prop actually overrides a component default. |
+
+**On adding more.** Reach for a package when the problem is genuinely solved
+elsewhere and getting it wrong is subtle — MIME parsing, Tailwind class
+conflicts, IMAP. Don't reach for one to save a dozen lines of code you fully
+understand. Two current judgement calls, so they don't get re-litigated
+silently:
+
+- **`src/lib/crypto.ts` stays hand-written.** It's ~40 lines of textbook
+  AES-256-GCM on Node's built-in `crypto` — the vetted primitive *is* the
+  library here, and a dependency that touches credentials is a supply-chain
+  risk for little gain. Its real gap is key rotation: change
+  `APP_PASSWORD_ENCRYPTION_KEY` today and every stored password becomes
+  undecryptable. If we need rotation, that's when a keychain library earns its
+  place.
+- **No ORM yet.** One table, three queries, and `better-sqlite3` is
+  synchronous. If that changes, the candidate is Drizzle (sync driver, types
+  inferred from a TS schema) rather than Prisma (async everywhere, generated
+  client, query engine).
+
+---
+
 ## The shape we're aiming for
 
 ```sh
@@ -52,21 +84,46 @@ Only create the folders a feature actually needs. An empty `hooks/` is noise.
 
 ### Where it actually is right now
 
-Honest gap: `src/features/` does not exist yet, because after the reset there
-is exactly one feature and it lives in `src/app/dashboard/`. That is fine at
-this size. **The next feature is the one that creates `src/features/`** — and
-when it does, `dashboard` moves too, so we never end up with two conventions
-running at once.
-
-Current tree:
-
 ```sh
-src/app/dashboard/    account list, add, remove (page + actions + form)
-src/lib/db.ts         SQLite connection, runs db/schemas/*.sql on boot
-src/lib/crypto.ts     AES-256-GCM for app passwords
-src/lib/imap.ts       IMAP client factory + read-only mailbox wrapper
-src/proxy.ts          Clerk middleware, protects /dashboard
+src/app/                          routing only
+  page.tsx                        landing
+  dashboard/page.tsx              thin route: account list + add form
+  dashboard/[accountId]/page.tsx  thin route: message list + viewer
+  dashboard/[accountId]/loading.tsx
+  dashboard/error.tsx             error boundary for the whole section
+  sign-in|sign-up/                Clerk catch-alls
+
+src/features/accounts/
+  actions/{list,add,remove}-account.ts
+  components/{account-list,add-account-form}.tsx
+  types.ts
+
+src/features/messages/
+  actions/{list-messages,get-message}.ts
+  components/{message-list,message-viewer}.tsx
+  utils/html-to-text.ts
+  types.ts
+
+src/components/ui/                button, input, card
+src/utils/cn.ts                   clsx + tailwind-merge
+src/lib/db.ts                     SQLite + migration runner
+src/lib/crypto.ts                 AES-256-GCM for app passwords
+src/lib/imap.ts                   IMAP client factory + read-only wrapper
+src/lib/imap-credentials.ts       loads + decrypts creds; shared by features
+src/proxy.ts                      Clerk middleware, protects /dashboard
 ```
+
+Two things worth reading as worked examples of the rules below:
+
+- **`src/lib/imap-credentials.ts`** exists because `messages` needed what
+  `accounts` owned. Rather than import across features, it got promoted to
+  `lib/`. That's rule 3 in practice.
+- **`account-list.tsx` links to `/dashboard/[accountId]`** instead of rendering
+  the message list itself. Composition happens at the route; the accounts
+  feature never learns that the messages feature exists.
+
+Still missing, and that's fine — `config/`, `hooks/`, `types/`. Add each when
+something needs it, not before.
 
 ---
 
@@ -92,12 +149,13 @@ Shared code never imports from features. Features never import from `app`.
 Follow the arrows and you can always answer "what breaks if I change this?"
 by looking rightward only.
 
-Enforce it rather than remembering it. This needs `eslint-plugin-import`,
-which is **not installed yet** — add it with the first feature:
+This is enforced, not remembered — `eslint.config.mjs` runs
+`import/no-restricted-paths` over `src/`, and `just lint` fails on a violation.
+The `eslint-import-resolver-typescript` setting is what makes it see through the
+`@/*` alias; without it every aliased import is invisible to the rule.
 
-```sh
-npm install -D eslint-plugin-import
-```
+**Adding a feature means adding a zone.** The cross-feature entry is per-feature,
+so a new `src/features/x` is unguarded until you add its line:
 
 ```js
 // eslint.config.mjs
@@ -153,7 +211,8 @@ import { groupBySender } from '@/features/grouping';                       // no
 | A component two features use | `src/components/` |
 | A pure function, no React, no I/O | `src/utils/` or the feature's `utils/` |
 | An env var | `src/config/` — read `process.env` in one place, not scattered |
-| A DB table | `db/schemas/NNN_name.sql` — numbered, idempotent, never edited in place |
+| A DB table or column change | `db/schemas/NNN_name.sql` — the next number. Migrations run once each, tracked in `user_version`; never edit one that's committed |
+| A shared class string | A component in `src/components/ui/`, not a `const` you import |
 
 When torn between shared and feature-local, **start feature-local**. Promoting
 later is easy; un-sharing a wrong abstraction is not.

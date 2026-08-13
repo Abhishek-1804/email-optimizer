@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { SignInButton, SignUpButton, Show, UserButton } from "@clerk/nextjs";
+import Button, { buttonClasses } from "@/components/ui/button";
 
 export default function Home() {
   return (
@@ -13,24 +14,19 @@ export default function Home() {
       <Show when="signed-out">
         <div className="flex gap-3">
           <SignInButton>
-            <button className="rounded-md bg-gray-900 px-5 py-2 text-sm font-medium text-white hover:bg-gray-700">
-              Sign in
-            </button>
+            <Button size="lg">Sign in</Button>
           </SignInButton>
           <SignUpButton>
-            <button className="rounded-md border border-gray-300 bg-white px-5 py-2 text-sm font-medium hover:bg-gray-100">
+            <Button variant="secondary" size="lg">
               Sign up
-            </button>
+            </Button>
           </SignUpButton>
         </div>
       </Show>
 
       <Show when="signed-in">
         <div className="flex items-center gap-4">
-          <Link
-            href="/dashboard"
-            className="rounded-md bg-gray-900 px-5 py-2 text-sm font-medium text-white hover:bg-gray-700"
-          >
+          <Link href="/dashboard" className={buttonClasses("primary", "lg")}>
             Go to dashboard
           </Link>
           <UserButton />

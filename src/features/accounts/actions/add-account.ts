@@ -5,28 +5,7 @@ import { revalidatePath } from "next/cache";
 import db from "@/lib/db";
 import { encrypt } from "@/lib/crypto";
 
-export type EmailAccount = {
-  id: number;
-  email: string;
-  imap_host: string;
-  imap_port: number;
-  label: string | null;
-  created_at: string;
-};
-
-export async function listEmailAccounts(): Promise<EmailAccount[]> {
-  const { userId } = await auth();
-  if (!userId) return [];
-
-  return db
-    .prepare(
-      `SELECT id, email, imap_host, imap_port, label, created_at
-       FROM email_accounts WHERE clerk_user_id = ? ORDER BY created_at DESC`
-    )
-    .all(userId) as EmailAccount[];
-}
-
-export async function addEmailAccount(formData: FormData) {
+export async function addAccount(formData: FormData) {
   const { userId } = await auth();
   if (!userId) throw new Error("Not authenticated");
 
@@ -47,16 +26,6 @@ export async function addEmailAccount(formData: FormData) {
     `INSERT INTO email_accounts (clerk_user_id, email, imap_host, imap_port, app_password, label)
      VALUES (?, ?, ?, ?, ?, ?)`
   ).run(userId, email, imapHost, imapPort, encrypt(appPassword), label);
-
-  revalidatePath("/dashboard");
-}
-
-export async function removeEmailAccount(formData: FormData) {
-  const { userId } = await auth();
-  if (!userId) throw new Error("Not authenticated");
-
-  const id = Number(formData.get("id"));
-  db.prepare(`DELETE FROM email_accounts WHERE id = ? AND clerk_user_id = ?`).run(id, userId);
 
   revalidatePath("/dashboard");
 }

@@ -1,10 +1,9 @@
 "use client";
 
 import { useRef, useState, useTransition } from "react";
-import { addEmailAccount } from "./actions";
-
-const inputClass =
-  "rounded-md border border-gray-300 bg-white px-3 py-2 text-sm focus:border-gray-500 focus:outline-none";
+import Button from "@/components/ui/button";
+import Input from "@/components/ui/input";
+import { addAccount } from "../actions/add-account";
 
 export default function AddAccountForm() {
   const formRef = useRef<HTMLFormElement>(null);
@@ -18,7 +17,7 @@ export default function AddAccountForm() {
         setError(null);
         startTransition(async () => {
           try {
-            await addEmailAccount(formData);
+            await addAccount(formData);
             formRef.current?.reset();
           } catch (err) {
             setError(err instanceof Error ? err.message : "Something went wrong");
@@ -27,25 +26,16 @@ export default function AddAccountForm() {
       }}
       className="flex max-w-sm flex-col gap-2.5"
     >
-      <input name="email" type="email" placeholder="you@gmail.com" required className={inputClass} />
-      <input
-        name="appPassword"
-        type="password"
-        placeholder="Gmail app password"
-        required
-        className={inputClass}
-      />
-      <input name="label" type="text" placeholder="Label (optional)" className={inputClass} />
+      <Input name="email" type="email" placeholder="you@gmail.com" required />
+      <Input name="appPassword" type="password" placeholder="Gmail app password" required />
+      <Input name="label" type="text" placeholder="Label (optional)" />
 
       {error && <p className="text-sm text-red-600">{error}</p>}
 
-      <button
-        type="submit"
-        disabled={isPending}
-        className="rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700 disabled:opacity-60"
-      >
+      <Button type="submit" disabled={isPending}>
         {isPending ? "Adding..." : "Add account"}
-      </button>
+      </Button>
+
       <p className="text-xs text-gray-500">
         Use a Gmail{" "}
         <a
