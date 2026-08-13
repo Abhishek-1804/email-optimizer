@@ -1,36 +1,49 @@
 "use server";
 
-import { withMailbox } from "@/lib/imap";
 import { loadImapCreds, imapError } from "@/lib/imap-credentials";
-import type { InboxMessage } from "../types";
+import { fetchRecent } from "../utils/fetch-recent";
+import type { AccountError, InboxMessage, InboxResult } from "../types";
 
-/** The most recent `limit` messages in INBOX, newest first. */
-export async function listMessages(accountId: number, limit = 25): Promise<InboxMessage[]> {
-  const creds = await loadImapCreds(accountId);
+type PerAccount =
+  | { ok: true; messages: InboxMessage[] }
+  | { ok: false; error: AccountError };
 
-  try {
-    return await withMailbox(creds, "INBOX", async (client, state) => {
-      if (state.exists === 0) return [];
+/**
+ * Recent messages across one or more mailboxes, newest first.
+ *
+ * One account is just the single-element case — there is no separate path for
+ * it. The ids come from the caller, but `loadImapCreds` scopes every lookup by
+ * the signed-in user, so an id that isn't yours resolves to nothing.
+ *
+ * Mailboxes are read concurrently and each failure is captured rather than
+ * thrown, so one stale app password reports itself and the rest still renders.
+ */
+export async function listMessages(
+  accountIds: number[],
+  perAccount = 25
+): Promise<InboxResult> {
+  const results = await Promise.all(
+    accountIds.map(async (accountId): Promise<PerAccount> => {
+      let accountEmail: string | null = null;
 
-      const start = Math.max(1, state.exists - limit + 1);
-      const messages: InboxMessage[] = [];
-
-      for await (const msg of client.fetch(`${start}:${state.exists}`, {
-        envelope: true,
-        uid: true,
-      })) {
-        messages.push({
-          uid: msg.uid,
-          subject: msg.envelope?.subject ?? "(no subject)",
-          from: msg.envelope?.from?.[0]?.address ?? "(unknown sender)",
-          date: msg.envelope?.date ? new Date(msg.envelope.date).toISOString() : null,
-        });
+      try {
+        const creds = await loadImapCreds(accountId);
+        accountEmail = creds.email;
+        return { ok: true, messages: await fetchRecent(creds, accountId, perAccount) };
+      } catch (err) {
+        console.error(`IMAP list failed for account ${accountId}:`, err);
+        return {
+          ok: false,
+          error: { accountId, accountEmail, message: imapError(err).message },
+        };
       }
+    })
+  );
 
-      return messages.reverse();
-    });
-  } catch (err) {
-    console.error(`IMAP list failed for account ${accountId}:`, err);
-    throw imapError(err);
-  }
+  const messages = results.flatMap((r) => (r.ok ? r.messages : []));
+  const errors = results.flatMap((r) => (r.ok ? [] : [r.error]));
+
+  messages.sort((a, b) => (b.date ?? "").localeCompare(a.date ?? ""));
+
+  return { messages, errors };
 }

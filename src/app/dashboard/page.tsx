@@ -1,4 +1,6 @@
+import Link from "next/link";
 import { UserButton } from "@clerk/nextjs";
+import { buttonClasses } from "@/components/ui/button";
 import { listAccounts } from "@/features/accounts/actions/list-accounts";
 import AccountList from "@/features/accounts/components/account-list";
 import AddAccountForm from "@/features/accounts/components/add-account-form";
@@ -14,6 +16,13 @@ export default async function DashboardPage() {
       </header>
 
       <section className="mb-8">
+        {accounts.length > 1 && (
+          <div className="mb-3">
+            <Link href="/dashboard/all" className={buttonClasses("primary", "sm")}>
+              View all inboxes
+            </Link>
+          </div>
+        )}
         <AccountList accounts={accounts} />
       </section>
 

@@ -21,6 +21,8 @@ export async function getMessage(accountId: number, uid: number): Promise<Messag
       const text = parsed.text ?? (parsed.html ? htmlToText(parsed.html) : "");
 
       return {
+        accountId,
+        accountEmail: creds.email,
         uid,
         subject: parsed.subject ?? "(no subject)",
         from: parsed.from?.text ?? "(unknown sender)",
