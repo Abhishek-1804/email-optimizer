@@ -10,7 +10,9 @@
   },
   "dependencies": {
     "@clerk/nextjs": "^7.5.12",
+    "better-sqlite3": "^13.0.3",
     "clsx": "^2.1.1",
+    "google-auth-library": "^11.0.2",
     "imapflow": "^1.4.7",
     "mailparser": "^3.9.15",
     "next": "16.2.10",
@@ -20,6 +22,7 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.3.2",
+    "@types/better-sqlite3": "^9.6.0",
     "@types/mailparser": "^3.4.6",
     "@types/node": "^20",
     "@types/react": "^19",

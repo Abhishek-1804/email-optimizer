@@ -22,6 +22,8 @@ next:
 
 
 known issues:
+- no error.tsx or loading.tsx anywhere — dropped for v0. Failures fall through to
+  Next's default page and navigation hangs silently during the IMAP round trip
 - every message click opens a fresh IMAP connection (~1s); fix via the cache, not client state
 - viewer is text-only; real HTML needs sanitising + sandboxed iframe, remote images off
 - postcss.config.mjs fails silently: build passes, Tailwind emits an empty stylesheet

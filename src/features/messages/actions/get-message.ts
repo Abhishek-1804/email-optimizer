@@ -2,7 +2,7 @@
 
 import { simpleParser } from "mailparser";
 import { withMailbox } from "@/lib/imap";
-import { loadImapCreds, imapError } from "@/lib/imap-credentials";
+import { loadImapCreds, imapError } from "@/lib/mailboxes";
 import { htmlToText } from "../utils/html-to-text";
 import type { MessageDetail } from "../types";
 

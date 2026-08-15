@@ -1,11 +1,15 @@
 import Link from "next/link";
 import { UserButton } from "@clerk/nextjs";
 import { buttonClasses } from "@/components/ui/button";
-import { listMailboxes } from "@/features/accounts/actions/list-mailboxes";
+import { listMailboxes } from "@/lib/mailboxes";
 import MailboxList from "@/features/accounts/components/mailbox-list";
-import ConnectMailbox from "@/features/accounts/components/connect-mailbox";
 
-export default async function DashboardPage() {
+type Props = {
+  searchParams: Promise<{ connected?: string; error?: string }>;
+};
+
+export default async function DashboardPage({ searchParams }: Props) {
+  const { connected, error } = await searchParams;
   const mailboxes = await listMailboxes();
   const readable = mailboxes.filter((m) => m.hasMailScope);
 
@@ -15,6 +19,17 @@ export default async function DashboardPage() {
         <h1 className="text-2xl font-semibold">Your mailboxes</h1>
         <UserButton />
       </header>
+
+      {connected && (
+        <p className="mb-4 rounded-lg border border-green-200 bg-green-50 p-3 text-sm text-green-800">
+          Connected {connected}.
+        </p>
+      )}
+      {error && (
+        <p className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+          {error}
+        </p>
+      )}
 
       <section className="mb-8">
         {readable.length > 1 && (
@@ -28,13 +43,16 @@ export default async function DashboardPage() {
       </section>
 
       <section>
-        <h2 className="mb-3 text-lg font-semibold">Add another</h2>
+        <h2 className="mb-3 text-lg font-semibold">Connect a mailbox</h2>
         <p className="mb-3 max-w-md text-sm text-gray-500">
-          Google will ask you to approve access. Nothing is stored here — the
-          connection lives with your Google account and you can revoke it there
-          at any time.
+          Google will ask you to approve access, and you can pick any account —
+          connect as many as you like. Revoke any of them from your Google
+          account at any time.
         </p>
-        <ConnectMailbox />
+        {/* A plain link, not a button: this leaves the app for Google. */}
+        <Link href="/api/mailboxes/connect" prefetch={false} className={buttonClasses()}>
+          Connect a Gmail account
+        </Link>
       </section>
     </div>
   );

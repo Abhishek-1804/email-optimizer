@@ -22,9 +22,23 @@ build:
 lint:
     npm run lint
 
-# Remove regenerable files (deps, lockfile, build output, local db, bin).
+# Deliberately leaves data/ alone: the mailboxes in it cost a Google consent
+# round trip each to restore. Use `just clean-data` when you actually mean it.
+#
+# Remove regenerable files (deps, lockfile, build output, IDE, bin).
 clean:
-    rm -rf node_modules .next data
-    rm -f package-lock.json ./*.tsbuildinfo next-env.d.ts
+    rm -rf node_modules .next out build coverage .idea .vscode
+    rm -f package-lock.json ./*.tsbuildinfo next-env.d.ts ./*.log
+    find . -name .DS_Store -not -path "./.git/*" -delete
     rm -rf "{{bin_dir}}"
     echo "Cleaned. Run 'just dev' to reinstall and start."
+
+# You reconnect each mailbox from the dashboard afterwards.
+#
+# Drop the local database, connected mailboxes and all.
+clean-data:
+    rm -rf data
+    echo "Local database removed. Reconnect your mailboxes from the dashboard."
+
+# Everything: regenerable files and the database.
+clean-all: clean clean-data

@@ -1,6 +1,6 @@
 "use server";
 
-import { loadImapCreds, imapError } from "@/lib/imap-credentials";
+import { loadImapCreds, imapError } from "@/lib/mailboxes";
 import { fetchRecent } from "../utils/fetch-recent";
 import type { AccountError, InboxMessage, InboxResult } from "../types";
 

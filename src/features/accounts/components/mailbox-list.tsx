@@ -1,8 +1,8 @@
 import Link from "next/link";
-import { buttonClasses } from "@/components/ui/button";
+import Button, { buttonClasses } from "@/components/ui/button";
 import Card from "@/components/ui/card";
-import { DisconnectMailbox } from "./connect-mailbox";
-import type { Mailbox } from "../types";
+import { disconnectMailbox } from "../actions/disconnect-mailbox";
+import type { Mailbox } from "@/lib/mailboxes";
 
 export default function MailboxList({ mailboxes }: { mailboxes: Mailbox[] }) {
   if (mailboxes.length === 0) {
@@ -16,7 +16,7 @@ export default function MailboxList({ mailboxes }: { mailboxes: Mailbox[] }) {
   return (
     <ul className="flex flex-col gap-3">
       {mailboxes.map((box) => (
-        <li key={box.externalAccountId}>
+        <li key={box.id}>
           <Card className="flex items-center justify-between gap-3">
             <div className="min-w-0">
               <div className="truncate font-medium">{box.email}</div>
@@ -32,14 +32,16 @@ export default function MailboxList({ mailboxes }: { mailboxes: Mailbox[] }) {
 
             <div className="flex shrink-0 items-center gap-2">
               {box.hasMailScope && (
-                <Link
-                  href={`/dashboard/${box.externalAccountId}`}
-                  className={buttonClasses("secondary", "sm")}
-                >
+                <Link href={`/dashboard/${box.id}`} className={buttonClasses("secondary", "sm")}>
                   View inbox
                 </Link>
               )}
-              <DisconnectMailbox externalAccountId={box.externalAccountId} />
+              <form action={disconnectMailbox}>
+                <input type="hidden" name="id" value={box.id} />
+                <Button type="submit" variant="danger" size="sm">
+                  Disconnect
+                </Button>
+              </form>
             </div>
           </Card>
         </li>

@@ -19,7 +19,9 @@ it are in `todo.txt`.
 | Tool | Used for | Notes |
 | --- | --- | --- |
 | [Next.js 16](https://nextjs.org) (App Router) + React 19 | Framework | Server components by default. `params` and `searchParams` are Promises — `await` them. |
-| [Clerk](https://clerk.com) | Auth **and** OAuth token custody | `src/proxy.ts` protects `/dashboard`. Every server action re-checks `auth()` — middleware is not authorization. Clerk also holds the Google refresh tokens, which is why this app has no database. |
+| [Clerk](https://clerk.com) | Sign-in only | `src/proxy.ts` protects `/dashboard`. Every server action re-checks `auth()` — middleware is not authorization. Clerk knows nothing about mailboxes. |
+| [google-auth-library](https://github.com/googleapis/google-auth-library-nodejs) | The mailbox OAuth flow | Google's own. Wrapped by `src/lib/google.ts`. Use `verifyIdToken()` rather than decoding a JWT by hand. |
+| [better-sqlite3](https://github.com/WiseLibs/better-sqlite3) | One table, holding encrypted refresh tokens | **Synchronous** — no `await` on queries. |
 | [imapflow](https://imapflow.com) | IMAP over XOAUTH2 | Wrapped by `src/lib/imap.ts`, which is the only place a mailbox is opened. |
 | [mailparser](https://nodemailer.com/extras/mailparser/) | MIME parsing | Email is a swamp of encodings and multipart nesting. Never hand-parse it. |
 | [Tailwind v4](https://tailwindcss.com) | Styling | Configured via `postcss.config.mjs` — remove that file and the build still passes while emitting an empty stylesheet. |
@@ -31,16 +33,18 @@ conflicts, IMAP. Don't reach for one to save a dozen lines of code you fully
 understand. Two current judgement calls, so they don't get re-litigated
 silently:
 
-- **There is no database, on purpose.** SQLite, the migration runner and the
-  AES-256-GCM helper all existed to store IMAP app passwords. OAuth removed the
-  reason for all three, so they were deleted rather than left holding an empty
-  table. Clerk is the source of truth for mailboxes.
-- **It comes back for the message cache, not for accounts.** Grouping mail by
-  sender means caching headers locally; that's the next real need for a
-  database, and it should arrive with a schema designed for messages. When it
-  does, the candidate is Drizzle (sync `better-sqlite3` driver, types inferred
-  from a TS schema) rather than Prisma (async everywhere, generated client,
-  query engine).
+- **`src/lib/crypto.ts` stays hand-written.** It's ~40 lines of textbook
+  AES-256-GCM on Node's built-in `crypto` — the vetted primitive *is* the
+  library, and every alternative wraps the same call. Its real gap is key
+  rotation: change `TOKEN_ENCRYPTION_KEY` and every stored refresh token becomes
+  undecryptable. If rotation ever matters, that's when a keyring library earns
+  its place, not before.
+- **No ORM, and no migration runner.** One table, a handful of queries. The
+  `.sql` file *is* the schema, replayed on boot. Change it and you delete
+  `data/app.db` and reconnect — two clicks. Both decisions get revisited when
+  the message cache lands and there's data that costs real time to rebuild; the
+  ORM candidate then is Drizzle (sync driver, types inferred from a TS schema)
+  rather than Prisma.
 
 ---
 
@@ -85,17 +89,16 @@ Only create the folders a feature actually needs. An empty `hooks/` is noise.
 ```sh
 src/app/                          routing only
   page.tsx                        landing
-  dashboard/page.tsx              thin route: mailboxes + connect button
+  dashboard/page.tsx              thin route: mailboxes + connect link
   dashboard/[accountId]/page.tsx  thin route: one inbox
   dashboard/all/page.tsx          thin route: every inbox, merged
-  dashboard/error.tsx             error boundary for the whole section
-  sso-callback/                   where Google returns after consent
+  api/mailboxes/connect/route.ts  starts Google consent
+  api/mailboxes/callback/route.ts receives it, stores the refresh token
   sign-in|sign-up/                Clerk catch-alls
 
 src/features/accounts/
-  actions/list-mailboxes.ts
-  components/{mailbox-list,connect-mailbox}.tsx
-  types.ts
+  actions/disconnect-mailbox.ts
+  components/mailbox-list.tsx
 
 src/features/messages/
   actions/{list-messages,get-message}.ts
@@ -105,24 +108,29 @@ src/features/messages/
 
 src/components/ui/                button, input, card
 src/utils/cn.ts                   clsx + tailwind-merge
+src/lib/google.ts                 all Google OAuth
+src/lib/mailboxes.ts              the table, scoped to the signed-in user
 src/lib/imap.ts                   IMAP client factory + read-only wrapper
-src/lib/imap-credentials.ts       Clerk token -> IMAP creds; shared by features
+src/lib/crypto.ts                 AES-256-GCM
+src/lib/db.ts                     SQLite, applies db/schemas/*.sql
 src/proxy.ts                      Clerk middleware, protects /dashboard
+db/schemas/001_mailboxes.sql      one table
 ```
 
-No `src/lib/db.ts`, and that's deliberate — see "On adding more" above.
+Three things worth reading as worked examples of the rules below:
 
-Two things worth reading as worked examples of the rules below:
-
-- **`src/lib/imap-credentials.ts`** exists because `messages` needed what
-  `accounts` owned. Rather than import across features, it got promoted to
-  `lib/`. That's rule 3 in practice.
-- **`account-list.tsx` links to `/dashboard/[accountId]`** instead of rendering
+- **`src/lib/mailboxes.ts` is the only thing that touches its table**, and every
+  exported function scopes itself to the signed-in user. Callers never pass a
+  user id, so callers can't get the scoping wrong.
+- **`mailbox-list.tsx` links to `/dashboard/[accountId]`** instead of rendering
   the message list itself. Composition happens at the route; the accounts
-  feature never learns that the messages feature exists.
+  feature never learns the messages feature exists.
+- **The connect button is a plain `<a>`,** not a client component. It leaves the
+  app for Google, so there is nothing to manage in React.
 
-Still missing, and that's fine — `config/`, `hooks/`, `types/`. Add each when
-something needs it, not before.
+Deliberately absent for v0 — `config/`, `hooks/`, `types/`, and any `error.tsx`
+or `loading.tsx`. Failures currently fall through to Next's default page and
+navigation hangs silently during the IMAP round trip. Add them when hardening.
 
 ---
 
@@ -210,7 +218,7 @@ import { groupBySender } from '@/features/grouping';                       // no
 | A component two features use | `src/components/` |
 | A pure function, no React, no I/O | `src/utils/` or the feature's `utils/` |
 | An env var | `src/config/` — read `process.env` in one place, not scattered |
-| Anything needing persistence | Nowhere yet — there is no database. If you genuinely need one, that's a design conversation, not a file |
+| A DB table or column change | `db/schemas/NNN_name.sql`. There is no migration runner: edit the file, delete `data/app.db`, reconnect |
 | A shared class string | A component in `src/components/ui/`, not a `const` you import |
 
 When torn between shared and feature-local, **start feature-local**. Promoting
@@ -309,12 +317,13 @@ These connect to **real mailboxes**. They are not style preferences.
 - **Never log access tokens.** They're short-lived but they open the mailbox.
   Never print one, return it to the browser, or write it to a log. When
   debugging auth, log *shape* only: length, prefix, granted scopes.
-- **Never store a credential.** Clerk holds the refresh token; this app fetches
-  a fresh access token per request and keeps it in memory. If you find yourself
-  wanting to persist one, that's the signal something is wrong.
-- **Never commit `.env.local`,** or the `client_secret*.json` Google hands you
-  on download — Clerk holds those credentials and nothing here reads the file.
-  `.gitignore` is a conventional denylist,
+- **One credential is stored, and only one.** The Google refresh token, in
+  `mailboxes.refresh_token`, encrypted. It does not expire and it grants full
+  mailbox access including delete, so that column is the crown jewels. Access
+  tokens are minted per request and must never be persisted or logged.
+- **Never commit `.env.local` or `data/`.** The first holds
+  `TOKEN_ENCRYPTION_KEY`, the second holds everything it encrypts; together they
+  are full access to every connected mailbox. `.gitignore` is a conventional denylist,
   which means anything new is tracked *by default* — so when you add a file
   that holds secrets or local state, adding the ignore rule is part of the same
   change, not a follow-up. Check with `git status` before every commit.
