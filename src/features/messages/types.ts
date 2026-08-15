@@ -1,12 +1,12 @@
 /**
  * One row in the message list. Envelope data only — no body.
  *
- * Carries its account because the combined view mixes several mailboxes, and
+ * Carries its mailbox because the combined view mixes several of them, and
  * a uid is only unique within one of them.
  */
 export type InboxMessage = {
-  accountId: string;
-  accountEmail: string;
+  mailboxId: string;
+  mailboxEmail: string;
   uid: number;
   subject: string;
   from: string;
@@ -20,15 +20,15 @@ export type MessageDetail = InboxMessage & {
 };
 
 /** One mailbox that could not be read, so the rest of the view still renders. */
-export type AccountError = {
-  accountId: string;
-  /** null when the account row itself couldn't be loaded, so we never knew it. */
-  accountEmail: string | null;
+export type MailboxError = {
+  mailboxId: string;
+  /** null when the mailbox row itself couldn't be loaded, so we never knew it. */
+  mailboxEmail: string | null;
   message: string;
 };
 
 /** What a list request returns: whatever was readable, plus whatever wasn't. */
 export type InboxResult = {
   messages: InboxMessage[];
-  errors: AccountError[];
+  errors: MailboxError[];
 };

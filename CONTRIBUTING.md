@@ -90,13 +90,13 @@ Only create the folders a feature actually needs. An empty `hooks/` is noise.
 src/app/                          routing only
   page.tsx                        landing
   dashboard/page.tsx              thin route: mailboxes + connect link
-  dashboard/[accountId]/page.tsx  thin route: one inbox
+  dashboard/[mailboxId]/page.tsx  thin route: one inbox
   dashboard/all/page.tsx          thin route: every inbox, merged
   api/mailboxes/connect/route.ts  starts Google consent
   api/mailboxes/callback/route.ts receives it, stores the refresh token
   sign-in|sign-up/                Clerk catch-alls
 
-src/features/accounts/
+src/features/mailboxes/
   actions/disconnect-mailbox.ts
   components/mailbox-list.tsx
 
@@ -122,8 +122,8 @@ Three things worth reading as worked examples of the rules below:
 - **`src/lib/mailboxes.ts` is the only thing that touches its table**, and every
   exported function scopes itself to the signed-in user. Callers never pass a
   user id, so callers can't get the scoping wrong.
-- **`mailbox-list.tsx` links to `/dashboard/[accountId]`** instead of rendering
-  the message list itself. Composition happens at the route; the accounts
+- **`mailbox-list.tsx` links to `/dashboard/[mailboxId]`** instead of rendering
+  the message list itself. Composition happens at the route; the mailboxes
   feature never learns the messages feature exists.
 - **The connect button is a plain `<a>`,** not a client component. It leaves the
   app for Google, so there is nothing to manage in React.

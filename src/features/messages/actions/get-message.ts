@@ -7,8 +7,8 @@ import { htmlToText } from "../utils/html-to-text";
 import type { MessageDetail } from "../types";
 
 /** One message by UID, parsed down to plain text. */
-export async function getMessage(accountId: string, uid: number): Promise<MessageDetail> {
-  const creds = await loadImapCreds(accountId);
+export async function getMessage(mailboxId: string, uid: number): Promise<MessageDetail> {
+  const creds = await loadImapCreds(mailboxId);
 
   try {
     return await withMailbox(creds, "INBOX", async (client) => {
@@ -21,8 +21,8 @@ export async function getMessage(accountId: string, uid: number): Promise<Messag
       const text = parsed.text ?? (parsed.html ? htmlToText(parsed.html) : "");
 
       return {
-        accountId,
-        accountEmail: creds.email,
+        mailboxId,
+        mailboxEmail: creds.email,
         uid,
         subject: parsed.subject ?? "(no subject)",
         from: parsed.from?.text ?? "(unknown sender)",
@@ -34,7 +34,7 @@ export async function getMessage(accountId: string, uid: number): Promise<Messag
       };
     });
   } catch (err) {
-    console.error(`IMAP fetch failed for account ${accountId}, uid ${uid}:`, err);
+    console.error(`IMAP fetch failed for mailbox ${mailboxId}, uid ${uid}:`, err);
     throw imapError(err);
   }
 }

@@ -45,9 +45,9 @@ const eslintConfig = defineConfig([
             // No cross-feature imports. One entry per feature — a new feature
             // is unguarded until its line is added here.
             {
-              target: './src/features/accounts',
+              target: './src/features/mailboxes',
               from: './src/features',
-              except: ['./accounts'],
+              except: ['./mailboxes'],
             },
             {
               target: './src/features/messages',

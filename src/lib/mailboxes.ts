@@ -131,7 +131,7 @@ export function imapError(err: unknown): Error {
 
   if (e?.authenticationFailed) {
     return new Error(
-      "The mailbox rejected this token. Disconnect and reconnect the account to grant " +
+      "The mailbox rejected this token. Disconnect and reconnect the mailbox to grant " +
         "mail access again." + (e.responseText ? ` Server said: ${e.responseText}` : "")
     );
   }

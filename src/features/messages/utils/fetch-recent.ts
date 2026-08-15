@@ -4,12 +4,12 @@ import type { InboxMessage } from "../types";
 /**
  * The most recent `limit` messages in INBOX, newest first.
  *
- * Not a server action — it's the shared body behind both the single-account
+ * Not a server action — it's the shared body behind both the single-mailbox
  * and the combined view, so it takes credentials rather than looking them up.
  */
 export async function fetchRecent(
   creds: ImapAccount,
-  accountId: string,
+  mailboxId: string,
   limit: number
 ): Promise<InboxMessage[]> {
   return withMailbox(creds, "INBOX", async (client, state) => {
@@ -23,8 +23,8 @@ export async function fetchRecent(
       uid: true,
     })) {
       messages.push({
-        accountId,
-        accountEmail: creds.email,
+        mailboxId,
+        mailboxEmail: creds.email,
         uid: msg.uid,
         subject: msg.envelope?.subject ?? "(no subject)",
         from: msg.envelope?.from?.[0]?.address ?? "(unknown sender)",

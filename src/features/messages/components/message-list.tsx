@@ -5,14 +5,14 @@ import type { InboxMessage } from "../types";
 type Props = {
   messages: InboxMessage[];
   /** A uid is only unique within one mailbox, so selection needs both halves. */
-  selected: { accountId: string; uid: number } | null;
+  selected: { mailboxId: string; uid: number } | null;
   /** Each view owns its own URL shape; the list just renders what it's given. */
   hrefFor: (msg: InboxMessage) => string;
   /** Only useful when the list mixes mailboxes. */
-  showAccount?: boolean;
+  showMailbox?: boolean;
 };
 
-export default function MessageList({ messages, selected, hrefFor, showAccount }: Props) {
+export default function MessageList({ messages, selected, hrefFor, showMailbox }: Props) {
   if (messages.length === 0) {
     return <p className="text-sm text-gray-500">Inbox is empty.</p>;
   }
@@ -23,10 +23,10 @@ export default function MessageList({ messages, selected, hrefFor, showAccount }
     <ul className="flex min-h-0 flex-col gap-2 overflow-y-auto pr-1">
       {messages.map((msg) => {
         const isSelected =
-          selected?.accountId === msg.accountId && selected?.uid === msg.uid;
+          selected?.mailboxId === msg.mailboxId && selected?.uid === msg.uid;
 
         return (
-          <li key={`${msg.accountId}:${msg.uid}`}>
+          <li key={`${msg.mailboxId}:${msg.uid}`}>
             <Link
               href={hrefFor(msg)}
               scroll={false}
@@ -42,9 +42,9 @@ export default function MessageList({ messages, selected, hrefFor, showAccount }
 
               <div className="mt-1 flex items-center gap-2 text-xs text-gray-400">
                 {msg.date && <span>{new Date(msg.date).toLocaleString()}</span>}
-                {showAccount && (
+                {showMailbox && (
                   <span className="truncate rounded bg-gray-100 px-1.5 py-0.5 text-gray-600">
-                    {msg.accountEmail}
+                    {msg.mailboxEmail}
                   </span>
                 )}
               </div>

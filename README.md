@@ -115,11 +115,11 @@ verification before public launch.
 ```
 src/app/                     Routing only
   dashboard/                 Connected mailboxes (protected)
-  dashboard/[accountId]/     One inbox
+  dashboard/[mailboxId]/     One inbox
   dashboard/all/             Every inbox, merged
   api/mailboxes/connect/     Starts the Google consent flow
   api/mailboxes/callback/    Receives it, stores the refresh token
-src/features/accounts/       Listing and disconnecting mailboxes
+src/features/mailboxes/      Listing and disconnecting mailboxes
 src/features/messages/       Reading them
 src/components/ui/           Button, input, card
 src/lib/google.ts            All Google OAuth

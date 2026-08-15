@@ -2,7 +2,7 @@ import Link from "next/link";
 import { UserButton } from "@clerk/nextjs";
 import { buttonClasses } from "@/components/ui/button";
 import { listMailboxes } from "@/lib/mailboxes";
-import MailboxList from "@/features/accounts/components/mailbox-list";
+import MailboxList from "@/features/mailboxes/components/mailbox-list";
 
 type Props = {
   searchParams: Promise<{ connected?: string; error?: string }>;
