@@ -9,14 +9,11 @@ type PerMailbox =
   | { ok: false; error: MailboxError };
 
 /**
- * Recent messages across one or more mailboxes, newest first.
+ * Recent messages across one or more mailboxes, newest first. One mailbox is the
+ * single-element case.
  *
- * One mailbox is just the single-element case — there is no separate path for
- * it. The ids come from the caller, but `loadImapCreds` scopes every lookup by
- * the signed-in user, so an id that isn't yours resolves to nothing.
- *
- * Mailboxes are read concurrently and each failure is captured rather than
- * thrown, so one mailbox with a revoked grant reports itself and the rest still renders.
+ * Read concurrently, and each failure is captured rather than thrown, so one
+ * revoked grant reports itself while the rest still render.
  */
 export async function listMessages(
   mailboxIds: string[],

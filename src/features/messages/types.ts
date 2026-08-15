@@ -1,9 +1,4 @@
-/**
- * One row in the message list. Envelope data only — no body.
- *
- * Carries its mailbox because the combined view mixes several of them, and
- * a uid is only unique within one of them.
- */
+/** One list row. Envelope only. Carries its mailbox: a uid is unique only within one. */
 export type InboxMessage = {
   mailboxId: string;
   mailboxEmail: string;

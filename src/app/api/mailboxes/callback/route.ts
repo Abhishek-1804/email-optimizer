@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { exchangeCode, STATE_COOKIE, callbackUrl } from "@/lib/google";
-import { saveMailbox } from "@/lib/mailboxes";
+import { connectMailbox } from "@/lib/mailboxes";
 
 /** Sends the user back to the dashboard with a message it can render. */
 function back(request: Request, params: Record<string, string>) {
@@ -41,7 +41,7 @@ export async function GET(request: Request) {
 
   try {
     const mailbox = await exchangeCode(code, callbackUrl(request));
-    await saveMailbox(mailbox);
+    await connectMailbox(mailbox);
     return back(request, { connected: mailbox.email });
   } catch (err) {
     console.error("Mailbox connection failed:", err);

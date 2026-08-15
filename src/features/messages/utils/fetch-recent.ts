@@ -1,12 +1,7 @@
 import { withMailbox, type ImapAccount } from "@/lib/imap";
 import type { InboxMessage } from "../types";
 
-/**
- * The most recent `limit` messages in INBOX, newest first.
- *
- * Not a server action — it's the shared body behind both the single-mailbox
- * and the combined view, so it takes credentials rather than looking them up.
- */
+/** Newest `limit` messages in INBOX. Takes creds, so both views can share it. */
 export async function fetchRecent(
   creds: ImapAccount,
   mailboxId: string,

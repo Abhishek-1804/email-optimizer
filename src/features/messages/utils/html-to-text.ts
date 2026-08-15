@@ -1,10 +1,6 @@
 /**
- * Flattens an HTML-only email to plain text.
- *
- * The viewer renders text, never HTML: email HTML is attacker-controlled, so
- * putting it on the page means script injection, tracking pixels and remote
- * content. Rendering it properly needs sanitising plus a sandboxed iframe —
- * see todo.txt.
+ * Flattens an HTML-only email to text. We never render email HTML: it is
+ * attacker-controlled, so it needs sanitising plus a sandboxed iframe first.
  */
 export function htmlToText(html: string): string {
   return html

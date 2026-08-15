@@ -1,11 +1,7 @@
 import { OAuth2Client } from "google-auth-library";
 
-/**
- * Google OAuth for mailbox access, run by us rather than by Clerk.
- *
- * Clerk still owns sign-in. This owns mailbox authorization — a separate grant
- * with its own consent screen, so signing in never asks for mail access.
- */
+// Google OAuth for mailbox access. Clerk owns sign-in; this owns a separate
+// grant with its own consent screen, so signing in never asks for mail access.
 
 /** Full mailbox access. Google rejects anything but this exact string. */
 export const GMAIL_SCOPE = "https://mail.google.com/";
@@ -25,14 +21,12 @@ function client(redirectUri: string): OAuth2Client {
 }
 
 /**
- * Where to send the browser to start a connection.
- *
- * `access_type: "offline"` is what makes Google return a refresh token at all.
- * `prompt` does two jobs: `select_account` shows the chooser so a second
- * mailbox is reachable, and `consent` forces a fresh grant — without it Google
- * returns a refresh token only on the very first authorization, so reconnecting
- * would silently store nothing.
- */
+  * Where to send the browser to start a connection.
+  *
+  * `access_type: offline` is what returns a refresh token at all. `consent`
+  * forces a fresh one — without it only the first authorization gets one, so
+  * reconnects would store nothing. `select_account` shows the chooser.
+  */
 export function authorizeUrl(redirectUri: string, state: string): string {
   return client(redirectUri).generateAuthUrl({
     access_type: "offline",
@@ -58,8 +52,7 @@ export async function exchangeCode(
   const { tokens } = await oauth.getToken(code);
 
   if (!tokens.refresh_token) {
-    // Almost always a missing access_type, or a re-auth without prompt=consent.
-    // An access token alone would stop working within the hour.
+    // An access token alone dies within the hour, so refuse to store it.
     throw new Error(
       "Google returned no refresh token. Remove this app at " +
         "myaccount.google.com/permissions and connect again."
@@ -68,8 +61,7 @@ export async function exchangeCode(
 
   if (!tokens.id_token) throw new Error("Google did not say which account was connected");
 
-  // Verified, not merely decoded: checks Google's signature and that the token
-  // was issued for our client.
+  // Verified, not decoded: checks Google's signature and our client id.
   const ticket = await oauth.verifyIdToken({
     idToken: tokens.id_token,
     audience: process.env.GOOGLE_CLIENT_ID,
@@ -101,8 +93,7 @@ export async function revokeToken(refreshToken: string): Promise<void> {
   try {
     await client("").revokeToken(refreshToken);
   } catch {
-    // The row is deleted regardless: a token we no longer hold is unusable to
-    // us, and the user can always revoke from their Google account.
+    // Deleted regardless: a token we no longer hold is unusable to us.
   }
 }
 

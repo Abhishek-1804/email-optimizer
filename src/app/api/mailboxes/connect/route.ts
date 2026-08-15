@@ -6,10 +6,9 @@ import { authorizeUrl, STATE_COOKIE, callbackUrl } from "@/lib/google";
 /**
  * Starts a mailbox connection. Nothing is stored until Google redirects back.
  *
- * The `state` value is generated here and stashed in an httpOnly cookie so the
- * callback can prove the response belongs to a request this browser actually
- * made — without it, an attacker can hand a victim a crafted callback URL and
- * silently attach their own mailbox to the victim's account.
+ * `state` goes into an httpOnly cookie so the callback can prove the response
+ * belongs to a request this browser made — otherwise a crafted callback URL
+ * attaches an attacker's mailbox to the victim's account.
  */
 export async function GET(request: Request) {
   const { userId } = await auth();

@@ -15,10 +15,7 @@ export type MailboxState = {
   exists: number;
 };
 
-/**
- * Deliberately not exported. Every mailbox is opened through `withMailbox`, so
- * there is exactly one place that can choose EXAMINE vs SELECT — see below.
- */
+/** Not exported: withMailbox is the only thing that may open a mailbox. */
 function createClient(account: ImapAccount): ImapFlow {
   return new ImapFlow({
     host: account.host,
@@ -30,12 +27,11 @@ function createClient(account: ImapAccount): ImapFlow {
 }
 
 /**
- * Connects, opens a mailbox read-only, runs `fn`, then always disconnects.
+ * Connects, opens a mailbox read-only, runs `fn`, always disconnects.
  *
- * `readOnly` makes the server issue EXAMINE rather than SELECT, so writes are
- * refused at the protocol level rather than merely never attempted. IMAP has no
- * connection-wide read-only mode, so this is the narrowest place the guarantee
- * can live — and it holds even though the OAuth scope permits deletion.
+ * `readOnly` issues EXAMINE instead of SELECT, so the server refuses writes even
+ * though our OAuth scope permits deletion. Delete needs its own helper, not a
+ * flag here.
  */
 export async function withMailbox<T>(
   account: ImapAccount,

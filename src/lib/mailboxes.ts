@@ -5,13 +5,8 @@ import { GMAIL_SCOPE, accessTokenFor, revokeToken } from "@/lib/google";
 import type { ConnectedMailbox } from "@/lib/google";
 import type { ImapAccount } from "@/lib/imap";
 
-/**
- * The mailboxes table, and the only way anything reaches it.
- *
- * Every exported function scopes itself to the signed-in Clerk user, so an id
- * that belongs to someone else resolves to nothing. Callers never pass a user
- * id, which means they can't get the scoping wrong.
- */
+// The mailboxes table. Every export scopes itself to the signed-in user, so
+// callers never pass a user id and cannot get the scoping wrong.
 
 /** Per-provider IMAP endpoints. Only providers listed here can be read. */
 const IMAP_HOSTS: Record<string, { host: string; port: number }> = {
@@ -61,13 +56,14 @@ export async function listMailboxes(): Promise<Mailbox[]> {
 }
 
 /**
- * Stores a freshly granted mailbox.
+ * Records a grant, replacing any previous one for the same address.
  *
- * Reconnecting the same address replaces the token rather than adding a row —
- * Google issues a new refresh token on every `prompt=consent`, and keeping the
- * old one around would just leave a second live credential lying about.
+ * Upsert because `prompt=consent` mints a new refresh token on every reconnect:
+ * a plain insert would fail the unique constraint, and no constraint would leave
+ * one live credential per reconnect. The row keeps its id, so /dashboard/<id>
+ * still resolves afterwards.
  */
-export async function saveMailbox(mailbox: ConnectedMailbox): Promise<void> {
+export async function connectMailbox(mailbox: ConnectedMailbox): Promise<void> {
   const userId = await currentUser();
 
   db.prepare(
@@ -92,12 +88,7 @@ export async function removeMailbox(id: string): Promise<void> {
   db.prepare(`DELETE FROM mailboxes WHERE id = ? AND clerk_user_id = ?`).run(Number(id), userId);
 }
 
-/**
- * Turns a stored mailbox into live IMAP credentials.
- *
- * The access token is minted per call and never stored — only the refresh token
- * is, encrypted.
- */
+/** Live IMAP credentials. The access token is minted per call, never stored. */
 export async function loadImapCreds(id: string): Promise<ImapAccount> {
   const userId = await currentUser();
 
