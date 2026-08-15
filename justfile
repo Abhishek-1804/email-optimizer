@@ -6,7 +6,7 @@ set shell := ["bash", "-euo", "pipefail", "-c"]
 bin_dir := justfile_directory() + "/bin"
 export PATH := bin_dir + ":" + env_var('PATH')
 
-# Download Node.js + sqlite3 into bin/, then npm install.
+# Download the pinned toolchain (node, npm, sqlite3) into bin/, then npm install.
 install-deps:
     ./hack/install-deps.sh
 

@@ -44,7 +44,7 @@ Two filtering approaches are planned:
 ## Getting started
 
 This project is **self-contained**: the only tool you need preinstalled is
-[`just`](https://github.com/casey/just). It downloads Node.js
+[`just`](https://github.com/casey/just). It downloads Node.js and sqlite3
 (checksum-verified) into `bin/`, so nothing pollutes your system.
 
 ```bash
@@ -105,10 +105,10 @@ verification before public launch.
 | `just dev` | Install toolchain + deps, run the dev server |
 | `just build` | Production build |
 | `just lint` | ESLint (flat config) |
-| `just install-deps` | Download Node.js into `bin/`, then `npm install` |
-| `just clean` | Remove `node_modules`, lockfile, build output |
-| `just clean-bin` | Wipe the downloaded toolchain in `bin/` |
-| `just sync-agent-files` | Copy `CLAUDE.md` to the other agent-config filenames |
+| `just install-deps` | Download the pinned toolchain into `bin/`, then `npm install` |
+| `just clean` | Remove deps, lockfile, build output, `bin/` — keeps `data/` |
+| `just clean-data` | Drop the local database and its connected mailboxes |
+| `just clean-all` | Both of the above |
 
 ## Project layout
 
