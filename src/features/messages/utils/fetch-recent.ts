@@ -9,7 +9,7 @@ import type { InboxMessage } from "../types";
  */
 export async function fetchRecent(
   creds: ImapAccount,
-  accountId: number,
+  accountId: string,
   limit: number
 ): Promise<InboxMessage[]> {
   return withMailbox(creds, "INBOX", async (client, state) => {

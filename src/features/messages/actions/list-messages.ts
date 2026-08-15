@@ -16,10 +16,10 @@ type PerAccount =
  * the signed-in user, so an id that isn't yours resolves to nothing.
  *
  * Mailboxes are read concurrently and each failure is captured rather than
- * thrown, so one stale app password reports itself and the rest still renders.
+ * thrown, so one mailbox with a revoked grant reports itself and the rest still renders.
  */
 export async function listMessages(
-  accountIds: number[],
+  accountIds: string[],
   perAccount = 25
 ): Promise<InboxResult> {
   const results = await Promise.all(

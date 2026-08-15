@@ -7,7 +7,7 @@ type Props = {
   title: string;
   subtitle?: string;
   result: InboxResult;
-  selected: { accountId: number; uid: number } | null;
+  selected: { accountId: string; uid: number } | null;
   message: MessageDetail | null;
   hrefFor: (msg: InboxMessage) => string;
   showAccount?: boolean;

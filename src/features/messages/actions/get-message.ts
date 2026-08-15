@@ -7,7 +7,7 @@ import { htmlToText } from "../utils/html-to-text";
 import type { MessageDetail } from "../types";
 
 /** One message by UID, parsed down to plain text. */
-export async function getMessage(accountId: number, uid: number): Promise<MessageDetail> {
+export async function getMessage(accountId: string, uid: number): Promise<MessageDetail> {
   const creds = await loadImapCreds(accountId);
 
   try {

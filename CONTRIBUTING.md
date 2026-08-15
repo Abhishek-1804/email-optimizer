@@ -19,9 +19,8 @@ it are in `todo.txt`.
 | Tool | Used for | Notes |
 | --- | --- | --- |
 | [Next.js 16](https://nextjs.org) (App Router) + React 19 | Framework | Server components by default. `params` and `searchParams` are Promises — `await` them. |
-| [Clerk](https://clerk.com) | Auth | `src/proxy.ts` protects `/dashboard`. Every server action re-checks `auth()` — middleware is not authorization. |
-| [better-sqlite3](https://github.com/WiseLibs/better-sqlite3) | SQLite | **Synchronous** — no `await` on queries. That's the reason we're not on an async ORM. |
-| [imapflow](https://imapflow.com) | IMAP | Wrapped by `src/lib/imap.ts`, which is the only place a mailbox is opened. |
+| [Clerk](https://clerk.com) | Auth **and** OAuth token custody | `src/proxy.ts` protects `/dashboard`. Every server action re-checks `auth()` — middleware is not authorization. Clerk also holds the Google refresh tokens, which is why this app has no database. |
+| [imapflow](https://imapflow.com) | IMAP over XOAUTH2 | Wrapped by `src/lib/imap.ts`, which is the only place a mailbox is opened. |
 | [mailparser](https://nodemailer.com/extras/mailparser/) | MIME parsing | Email is a swamp of encodings and multipart nesting. Never hand-parse it. |
 | [Tailwind v4](https://tailwindcss.com) | Styling | Configured via `postcss.config.mjs` — remove that file and the build still passes while emitting an empty stylesheet. |
 | [clsx](https://github.com/lukeed/clsx) + [tailwind-merge](https://github.com/dcastil/tailwind-merge) | `src/utils/cn.ts` | `twMerge` resolves conflicting utilities so a `className` prop actually overrides a component default. |
@@ -32,17 +31,16 @@ conflicts, IMAP. Don't reach for one to save a dozen lines of code you fully
 understand. Two current judgement calls, so they don't get re-litigated
 silently:
 
-- **`src/lib/crypto.ts` stays hand-written.** It's ~40 lines of textbook
-  AES-256-GCM on Node's built-in `crypto` — the vetted primitive *is* the
-  library here, and a dependency that touches credentials is a supply-chain
-  risk for little gain. Its real gap is key rotation: change
-  `APP_PASSWORD_ENCRYPTION_KEY` today and every stored password becomes
-  undecryptable. If we need rotation, that's when a keychain library earns its
-  place.
-- **No ORM yet.** One table, three queries, and `better-sqlite3` is
-  synchronous. If that changes, the candidate is Drizzle (sync driver, types
-  inferred from a TS schema) rather than Prisma (async everywhere, generated
-  client, query engine).
+- **There is no database, on purpose.** SQLite, the migration runner and the
+  AES-256-GCM helper all existed to store IMAP app passwords. OAuth removed the
+  reason for all three, so they were deleted rather than left holding an empty
+  table. Clerk is the source of truth for mailboxes.
+- **It comes back for the message cache, not for accounts.** Grouping mail by
+  sender means caching headers locally; that's the next real need for a
+  database, and it should arrive with a schema designed for messages. When it
+  does, the candidate is Drizzle (sync `better-sqlite3` driver, types inferred
+  from a TS schema) rather than Prisma (async everywhere, generated client,
+  query engine).
 
 ---
 
@@ -87,31 +85,32 @@ Only create the folders a feature actually needs. An empty `hooks/` is noise.
 ```sh
 src/app/                          routing only
   page.tsx                        landing
-  dashboard/page.tsx              thin route: account list + add form
-  dashboard/[accountId]/page.tsx  thin route: message list + viewer
-  dashboard/[accountId]/loading.tsx
+  dashboard/page.tsx              thin route: mailboxes + connect button
+  dashboard/[accountId]/page.tsx  thin route: one inbox
+  dashboard/all/page.tsx          thin route: every inbox, merged
   dashboard/error.tsx             error boundary for the whole section
+  sso-callback/                   where Google returns after consent
   sign-in|sign-up/                Clerk catch-alls
 
 src/features/accounts/
-  actions/{list,add,remove}-account.ts
-  components/{account-list,add-account-form}.tsx
+  actions/list-mailboxes.ts
+  components/{mailbox-list,connect-mailbox}.tsx
   types.ts
 
 src/features/messages/
   actions/{list-messages,get-message}.ts
-  components/{message-list,message-viewer}.tsx
-  utils/html-to-text.ts
+  components/{inbox-view,message-list,message-viewer}.tsx
+  utils/{fetch-recent,html-to-text}.ts
   types.ts
 
 src/components/ui/                button, input, card
 src/utils/cn.ts                   clsx + tailwind-merge
-src/lib/db.ts                     SQLite + migration runner
-src/lib/crypto.ts                 AES-256-GCM for app passwords
 src/lib/imap.ts                   IMAP client factory + read-only wrapper
-src/lib/imap-credentials.ts       loads + decrypts creds; shared by features
+src/lib/imap-credentials.ts       Clerk token -> IMAP creds; shared by features
 src/proxy.ts                      Clerk middleware, protects /dashboard
 ```
+
+No `src/lib/db.ts`, and that's deliberate — see "On adding more" above.
 
 Two things worth reading as worked examples of the rules below:
 
@@ -211,7 +210,7 @@ import { groupBySender } from '@/features/grouping';                       // no
 | A component two features use | `src/components/` |
 | A pure function, no React, no I/O | `src/utils/` or the feature's `utils/` |
 | An env var | `src/config/` — read `process.env` in one place, not scattered |
-| A DB table or column change | `db/schemas/NNN_name.sql` — the next number. Migrations run once each, tracked in `user_version`; never edit one that's committed |
+| Anything needing persistence | Nowhere yet — there is no database. If you genuinely need one, that's a design conversation, not a file |
 | A shared class string | A component in `src/components/ui/`, not a `const` you import |
 
 When torn between shared and feature-local, **start feature-local**. Promoting
@@ -307,11 +306,15 @@ These connect to **real mailboxes**. They are not style preferences.
 - **Delete gets its own path.** When bulk delete lands, it must add a separate,
   obviously-named read-write helper — never relax `withMailbox`. Anything that
   can destroy mail should be impossible to reach by accident.
-- **Never log credentials.** App passwords are encrypted at rest and must never
-  be printed, returned to the browser, or written to logs. When debugging auth,
-  log *shape* only: length, charset, whether it contains spaces.
-- **Never commit `.env.local` or `data/`.** `data/app.db` holds the encrypted
-  app passwords and any cached mail. `.gitignore` is a conventional denylist,
+- **Never log access tokens.** They're short-lived but they open the mailbox.
+  Never print one, return it to the browser, or write it to a log. When
+  debugging auth, log *shape* only: length, prefix, granted scopes.
+- **Never store a credential.** Clerk holds the refresh token; this app fetches
+  a fresh access token per request and keeps it in memory. If you find yourself
+  wanting to persist one, that's the signal something is wrong.
+- **Never commit `.env.local`,** or the `client_secret*.json` Google hands you
+  on download — Clerk holds those credentials and nothing here reads the file.
+  `.gitignore` is a conventional denylist,
   which means anything new is tracked *by default* — so when you add a file
   that holds secrets or local state, adding the ignore rule is part of the same
   change, not a follow-up. Check with `git status` before every commit.

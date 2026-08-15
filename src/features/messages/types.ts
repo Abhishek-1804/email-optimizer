@@ -5,7 +5,7 @@
  * a uid is only unique within one of them.
  */
 export type InboxMessage = {
-  accountId: number;
+  accountId: string;
   accountEmail: string;
   uid: number;
   subject: string;
@@ -21,7 +21,7 @@ export type MessageDetail = InboxMessage & {
 
 /** One mailbox that could not be read, so the rest of the view still renders. */
 export type AccountError = {
-  accountId: number;
+  accountId: string;
   /** null when the account row itself couldn't be loaded, so we never knew it. */
   accountEmail: string | null;
   message: string;

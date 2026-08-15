@@ -18,29 +18,30 @@ Two filtering approaches are planned:
 
 ## What works today
 
-- **Auth** — sign in / sign up via [Clerk](https://clerk.com).
-- **Multiple accounts** — add and remove IMAP mailboxes from the dashboard.
-  Your Clerk login is separate from the mailboxes you connect: one account
-  can hold many mailboxes, and the email you log in with is not auto-added.
-- **Credentials encrypted at rest** — app passwords are stored with
-  AES-256-GCM (never plaintext, never sent back to the browser).
+- **Sign in with Google** — via [Clerk](https://clerk.com). Signing in *is*
+  connecting your mailbox; there is no second setup step.
+- **Multiple mailboxes** — connect more Gmail accounts from the dashboard and
+  read them together in one combined inbox.
+- **Nothing sensitive is stored** — this app has no database. Clerk holds the
+  OAuth refresh token and mints a short-lived access token per request; no
+  password, no app password, and nothing to leak.
 - **Read-only IMAP by construction** — mailboxes are opened with `EXAMINE`, so
   the server refuses writes at the protocol level. Nothing in this codebase can
-  modify or delete mail.
+  modify or delete mail, even though the OAuth scope would permit it.
 
 ## Tech stack
 
 - [Next.js 16](https://nextjs.org) (App Router) + React 19
-- [Clerk](https://clerk.com) for authentication
-- [imapflow](https://imapflow.com) for IMAP
-- [better-sqlite3](https://github.com/WiseLibs/better-sqlite3) for local storage
+- [Clerk](https://clerk.com) for auth *and* Google OAuth token custody
+- [imapflow](https://imapflow.com) for IMAP over XOAUTH2
+- [mailparser](https://nodemailer.com/extras/mailparser/) for MIME
 - [Tailwind CSS v4](https://tailwindcss.com) for styling
 
 ## Getting started
 
 This project is **self-contained**: the only tool you need preinstalled is
-[`just`](https://github.com/casey/just). It downloads Node.js and the sqlite3
-CLI (checksum-verified) into `bin/`, so nothing pollutes your system.
+[`just`](https://github.com/casey/just). It downloads Node.js
+(checksum-verified) into `bin/`, so nothing pollutes your system.
 
 ```bash
 just dev
@@ -57,18 +58,29 @@ Create a `.env.local` (git-ignored) with:
 # From `clerk init` / your Clerk dashboard
 NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_...
 CLERK_SECRET_KEY=sk_test_...
-
-# 32 random bytes, base64. Generate with:
-#   node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
-APP_PASSWORD_ENCRYPTION_KEY=...
 ```
 
-### Connecting a Gmail account
+That's the whole list. Google's client ID and secret live in the Clerk
+dashboard, not here — this app never talks to Google directly.
 
-Gmail requires an **app password** for IMAP — your regular password will be
-rejected. Enable 2-Step Verification, then generate a 16-character app
-password at <https://myaccount.google.com/apppasswords> and use that when
-adding the account.
+### Google OAuth setup
+
+Mailbox access needs your own Google Cloud OAuth client, because Clerk's shared
+development credentials cannot request Gmail scopes.
+
+1. **Google Cloud** → new project → OAuth consent screen (External).
+2. Add the scope `https://mail.google.com/` — the full URL, trailing slash
+   included. Bare `mail.google.com` is rejected with `invalid_scope`.
+3. Set publishing status to **In production**. Left in *Testing*, Google expires
+   refresh tokens after 7 days and every user must reconnect weekly.
+4. Create an **OAuth client ID → Web application**, and add Clerk's callback as
+   an authorized redirect URI (Clerk shows the exact value).
+5. **Clerk** → SSO Connections → Google → *Use custom credentials* → paste the
+   client ID and secret, and add `https://mail.google.com/` to the scopes.
+
+Until the app is verified by Google you'll see an "unverified app" interstitial
+and are capped at 100 users. That is expected; restricted Gmail scopes require
+verification before public launch.
 
 ## Commands (`just`)
 
@@ -77,25 +89,26 @@ adding the account.
 | `just dev` | Install toolchain + deps, run the dev server |
 | `just build` | Production build |
 | `just lint` | ESLint (flat config) |
-| `just install-deps` | Download Node.js + sqlite3 into `bin/`, then `npm install` |
-| `just clean` | Remove `node_modules`, lockfile, build output, local db |
+| `just install-deps` | Download Node.js into `bin/`, then `npm install` |
+| `just clean` | Remove `node_modules`, lockfile, build output |
 | `just clean-bin` | Wipe the downloaded toolchain in `bin/` |
 | `just sync-agent-files` | Copy `CLAUDE.md` to the other agent-config filenames |
 
 ## Project layout
 
 ```
-src/app/                 App Router pages
-  page.tsx               Landing page
-  dashboard/             Account management (protected)
-  sign-in, sign-up/      Clerk auth pages
-src/lib/
-  db.ts                  SQLite connection, applies db/schemas/*.sql
-  crypto.ts              AES-256-GCM encrypt/decrypt for app passwords
-  imap.ts                IMAP client factory + read-only mailbox wrapper
-src/proxy.ts             Clerk middleware (protects /dashboard)
-db/schemas/              SQL schema, numbered and idempotent
-hack/install-deps.sh     Toolchain bootstrap
+src/app/                     Routing only
+  dashboard/                 Connected mailboxes (protected)
+  dashboard/[accountId]/     One inbox
+  dashboard/all/             Every inbox, merged
+  sso-callback/              Where Google returns after consent
+src/features/accounts/       Connecting and listing mailboxes
+src/features/messages/       Reading them
+src/components/ui/           Button, input, card
+src/lib/imap.ts              IMAP client factory + read-only wrapper
+src/lib/imap-credentials.ts  Clerk token -> IMAP credentials
+src/proxy.ts                 Clerk middleware (protects /dashboard)
+hack/install-deps.sh         Toolchain bootstrap
 ```
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for where new code goes as this grows —
@@ -104,8 +117,9 @@ constraints that apply because these are real mailboxes.
 
 ## Roadmap
 
-- Manual block-list to filter chosen senders across all accounts
-- `List-Unsubscribe` header detection to suggest bulk-filter candidates
-- Incremental IMAP sync (track last-seen UID) instead of re-fetching
-- OAuth for mailbox connections (replacing app passwords)
-- Encrypt with a rotatable key / move off local SQLite for real deployments
+- Group messages by mailing list (`List-Unsubscribe`, `List-Id`, DKIM `d=`)
+- Bulk delete per group, gated hard — the first write this app will ever make
+- Manual block-list to filter chosen senders across all mailboxes
+- Local message cache so grouping doesn't re-fetch over IMAP every time
+- Outlook, via the same OAuth path (`microsoft` is already wired in)
+- Google OAuth verification, required before serving more than 100 users

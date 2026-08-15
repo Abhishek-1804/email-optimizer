@@ -5,7 +5,7 @@ import type { InboxMessage } from "../types";
 type Props = {
   messages: InboxMessage[];
   /** A uid is only unique within one mailbox, so selection needs both halves. */
-  selected: { accountId: number; uid: number } | null;
+  selected: { accountId: string; uid: number } | null;
   /** Each view owns its own URL shape; the list just renders what it's given. */
   hrefFor: (msg: InboxMessage) => string;
   /** Only useful when the list mixes mailboxes. */

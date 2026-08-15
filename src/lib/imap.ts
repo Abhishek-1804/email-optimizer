@@ -1,10 +1,11 @@
 import { ImapFlow } from "imapflow";
 
 export type ImapAccount = {
-  imap_host: string;
-  imap_port: number;
+  host: string;
+  port: number;
   email: string;
-  appPassword: string;
+  /** OAuth 2.0 access token. imapflow sends it as XOAUTH2. */
+  accessToken: string;
 };
 
 /** Mailbox identity at the moment we opened it. */
@@ -20,10 +21,10 @@ export type MailboxState = {
  */
 function createClient(account: ImapAccount): ImapFlow {
   return new ImapFlow({
-    host: account.imap_host,
-    port: account.imap_port,
+    host: account.host,
+    port: account.port,
     secure: true,
-    auth: { user: account.email, pass: account.appPassword },
+    auth: { user: account.email, accessToken: account.accessToken },
     logger: false,
   });
 }
@@ -34,9 +35,7 @@ function createClient(account: ImapAccount): ImapFlow {
  * `readOnly` makes the server issue EXAMINE rather than SELECT, so writes are
  * refused at the protocol level rather than merely never attempted. IMAP has no
  * connection-wide read-only mode, so this is the narrowest place the guarantee
- * can live.
- *
- * No callers yet — this is the seed the next mail feature builds on.
+ * can live — and it holds even though the OAuth scope permits deletion.
  */
 export async function withMailbox<T>(
   account: ImapAccount,

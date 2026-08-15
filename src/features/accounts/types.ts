@@ -1,12 +1,6 @@
 /**
- * A connected IMAP mailbox. Mirrors the columns of `email_accounts` that are
- * safe to send to the browser — notably not `app_password`.
+ * Re-exported so the feature has one obvious place for its types. It can't live
+ * in the action file: a "use server" module may only export async functions,
+ * and a type export there fails the build rather than being erased.
  */
-export type EmailAccount = {
-  id: number;
-  email: string;
-  imap_host: string;
-  imap_port: number;
-  label: string | null;
-  created_at: string;
-};
+export type { Mailbox } from "@/lib/imap-credentials";

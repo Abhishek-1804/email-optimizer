@@ -8,7 +8,7 @@ type Props = {
 };
 
 export default async function InboxPage({ params, searchParams }: Props) {
-  const accountId = Number((await params).accountId);
+  const { accountId } = await params;
   const uid = (await searchParams).uid;
   const selected = uid ? { accountId, uid: Number(uid) } : null;
 
@@ -18,6 +18,7 @@ export default async function InboxPage({ params, searchParams }: Props) {
   return (
     <InboxView
       title="Inbox"
+      subtitle={result.messages[0]?.accountEmail}
       result={result}
       selected={selected}
       message={message}
