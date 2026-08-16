@@ -30,6 +30,13 @@ const eslintConfig = defineConfig([
             // Unidirectional: features must not reach into the app layer.
             { target: './src/features', from: './src/app' },
 
+            // lib/db is SQL-only and private to the lib services: pages and
+            // features go through lib/mailboxes or lib/message-cache.
+            {
+              target: ['./src/app', './src/features'],
+              from: './src/lib/db',
+            },
+
             // Shared modules must not reach into features or app.
             {
               target: [
