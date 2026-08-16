@@ -1,10 +1,13 @@
 import Link from "next/link";
 import Card from "@/components/ui/card";
 import { domainGroups } from "@/lib/message-cache";
+import { activeRules } from "@/lib/blocklist";
+import BlockButton from "@/features/filtering/components/block-button";
 
 /** Level 1: one row per sender domain, biggest first. */
 export default async function FilterPage() {
   const groups = await domainGroups();
+  const rules = await activeRules();
 
   return (
     <div className="mx-auto max-w-3xl p-8">
@@ -33,25 +36,32 @@ export default async function FilterPage() {
         <ul className="flex flex-col gap-2">
           {groups.map((g) => (
             <li key={g.domain}>
-              <Link href={`/dashboard/filter/${encodeURIComponent(g.domain)}`} className="block">
-                <Card className="flex items-center justify-between gap-3 transition-colors hover:bg-gray-50">
-                  <div className="min-w-0">
-                    <div className="truncate font-medium">{g.domain}</div>
-                    <div className="text-xs text-gray-500">
-                      {g.senders} {g.senders === 1 ? "sender" : "senders"}
-                      {g.latest && ` · latest ${new Date(g.latest).toLocaleDateString()}`}
-                    </div>
+              <Card className="flex items-center justify-between gap-3">
+                <Link
+                  href={`/dashboard/filter/${encodeURIComponent(g.domain)}`}
+                  className="min-w-0 flex-1"
+                >
+                  <div className="truncate font-medium">{g.domain}</div>
+                  <div className="text-xs text-gray-500">
+                    {g.senders} {g.senders === 1 ? "sender" : "senders"}
+                    {g.latest && ` · latest ${new Date(g.latest).toLocaleDateString()}`}
                   </div>
-                  <div className="flex shrink-0 items-center gap-2 text-sm">
-                    {g.bulk > 0 && (
-                      <span className="rounded bg-amber-100 px-1.5 py-0.5 text-xs text-amber-800">
-                        {g.bulk} bulk
-                      </span>
-                    )}
-                    <span className="font-medium tabular-nums">{g.messages}</span>
-                  </div>
-                </Card>
-              </Link>
+                </Link>
+                <div className="flex shrink-0 items-center gap-2 text-sm">
+                  {g.bulk > 0 && (
+                    <span className="rounded bg-amber-100 px-1.5 py-0.5 text-xs text-amber-800">
+                      {g.bulk} bulk
+                    </span>
+                  )}
+                  <span className="font-medium tabular-nums">{g.messages}</span>
+                  <BlockButton
+                    kind="domain"
+                    value={g.domain}
+                    back="/dashboard/filter"
+                    blocked={rules.domains.has(g.domain)}
+                  />
+                </div>
+              </Card>
             </li>
           ))}
         </ul>

@@ -53,10 +53,10 @@ export async function syncMailbox(mailboxId: string): Promise<SyncResult> {
     const stored = messageDb.syncState(id, FOLDER);
 
     // UIDs only mean anything within one UIDVALIDITY generation.
-    const reset = stored.count > 0 && stored.uid_validity !== state.uidValidity;
+    const reset = stored.count > 0 && stored.uidValidity !== state.uidValidity;
     if (reset) messageDb.deleteForMailbox(id, FOLDER);
 
-    const sinceUid = reset ? 0 : (stored.last_uid ?? 0);
+    const sinceUid = reset ? 0 : (stored.lastUid ?? 0);
     const rows: messageDb.HeaderRow[] = [];
 
     if (state.exists > 0) {
@@ -68,13 +68,14 @@ export async function syncMailbox(mailboxId: string): Promise<SyncResult> {
         // `UID FETCH n:*` returns the last message even when n is past the end.
         if (msg.uid <= sinceUid) continue;
 
+        const fromAddress = msg.envelope?.from?.[0]?.address ?? null;
         const raw = msg.headers?.toString("utf8") ?? "";
         rows.push({
           uid: msg.uid,
           messageId: msg.envelope?.messageId ?? null,
           subject: msg.envelope?.subject ?? null,
           fromName: msg.envelope?.from?.[0]?.name ?? null,
-          fromAddress: msg.envelope?.from?.[0]?.address ?? null,
+          fromAddress,
           date: msg.envelope?.date ? new Date(msg.envelope.date).toISOString() : null,
           size: msg.size ?? null,
           listId: headerValue(raw, "list-id"),

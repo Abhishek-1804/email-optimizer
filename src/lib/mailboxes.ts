@@ -56,7 +56,7 @@ export async function removeMailbox(id: string): Promise<void> {
   const row = mailboxDb.getForUser(userId, Number(id));
   if (!row) return;
 
-  await revokeToken(decrypt(row.refresh_token));
+  await revokeToken(decrypt(row.refreshToken));
   mailboxDb.deleteForUser(userId, Number(id));
 }
 
@@ -78,7 +78,7 @@ export async function loadImapCreds(id: string): Promise<ImapAccount> {
     host: endpoint.host,
     port: endpoint.port,
     email: row.email,
-    accessToken: await accessTokenFor(decrypt(row.refresh_token)),
+    accessToken: await accessTokenFor(decrypt(row.refreshToken)),
   };
 }
 

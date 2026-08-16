@@ -25,17 +25,16 @@ export default function SpamFilterOptions() {
         </p>
       </Link>
 
-      <div className="rounded-lg border border-gray-100 p-3 opacity-60">
-        <div className="text-sm font-medium">
-          Manual block list
-          <span className="ml-2 rounded bg-gray-100 px-1.5 py-0.5 text-xs font-normal text-gray-500">
-            coming soon
-          </span>
-        </div>
+      <Link
+        href="/dashboard/blocklist"
+        className="rounded-lg border border-gray-200 p-3 transition-colors hover:bg-gray-50"
+      >
+        <div className="text-sm font-medium">Blocked senders</div>
         <p className="mt-0.5 text-xs text-gray-500">
-          Curate a list of addresses yourself; anything they send gets filtered.
+          The list you build with the Block buttons. Applying moves their mail
+          into a folder in your own mailbox, and future syncs skip them.
         </p>
-      </div>
+      </Link>
     </Card>
   );
 }

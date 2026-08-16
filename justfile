@@ -10,9 +10,17 @@ export PATH := bin_dir + ":" + env_var('PATH')
 install-deps:
     ./hack/install-deps.sh
 
-# Run the Next.js dev server.
-dev: install-deps
+# Run the Next.js dev server. Warns first if schema.ts needs a new migration.
+dev: install-deps db-check
     npm run dev
+
+# Write a migration for whatever changed in src/lib/db/schema.ts.
+db-generate:
+    npx drizzle-kit generate
+
+# Check whether schema.ts and db/migrations agree.
+db-check:
+    ./hack/check-schema.sh
 
 # Production build.
 build:

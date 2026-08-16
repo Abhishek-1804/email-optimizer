@@ -1,42 +1,54 @@
+import { and, count, countDistinct, desc, eq, isNotNull, isNull, like, max, sql } from "drizzle-orm";
 import db from "./client";
+import { mailboxes, messages } from "./schema";
 
 // SQL for messages_metadata. Same contract as db/mailboxes: explicit ids in,
 // rows out, nothing else.
 
-export type HeaderRow = {
-  uid: number;
-  messageId: string | null;
-  subject: string | null;
-  fromName: string | null;
-  fromAddress: string | null;
-  date: string | null;
-  size: number | null;
-  listId: string | null;
-  listUnsubscribe: string | null;
-  dkimDomain: string | null;
-  rawHeaders: string;
-};
+/** What a sync inserts. Inferred, so a schema change surfaces here. */
+export type HeaderRow = Omit<
+  typeof messages.$inferInsert,
+  "id" | "mailboxId" | "folder" | "uidValidity"
+>;
 
-/** Where a sync should resume from, and which UID generation the cache holds. */
+// SQLite string functions Drizzle has no helper for. Declared once each so the
+// raw SQL lives in one place rather than at every call site.
+const lower = (col: unknown) => sql<string>`lower(${col})`;
+
+/** The sender domain, derived in SQL so grouping never needs a second pass. */
+const domain = sql<string>`lower(substr(${messages.fromAddress}, instr(${messages.fromAddress}, '@') + 1))`;
+
+/** Carries List-Unsubscribe — how bulk mail declares itself. */
+const isBulk = sql<number>`coalesce(sum(${messages.listUnsubscribe} is not null), 0)`;
+
+/**
+ * Where a sync should resume from, and which UID generation the cache holds.
+ * Counts moved rows too — MAX(uid) is where the folder got to, regardless of
+ * what we have since moved out of it.
+ */
 export function syncState(mailboxId: number, folder: string) {
-  return db
-    .prepare(
-      `SELECT uid_validity, MAX(uid) AS last_uid, COUNT(*) AS count
-       FROM messages_metadata WHERE mailbox_id = ? AND folder = ?`
-    )
-    .get(mailboxId, folder) as {
-    uid_validity: number | null;
-    last_uid: number | null;
-    count: number;
+  const row = db
+    .select({
+      uidValidity: max(messages.uidValidity),
+      lastUid: max(messages.uid),
+      count: count(),
+    })
+    .from(messages)
+    .where(and(eq(messages.mailboxId, mailboxId), eq(messages.folder, folder)))
+    .get();
+
+  return {
+    uidValidity: row?.uidValidity ?? null,
+    lastUid: row?.lastUid ?? null,
+    count: row?.count ?? 0,
   };
 }
 
 /** Wipes one mailbox's cache — used when UIDVALIDITY changes. */
 export function deleteForMailbox(mailboxId: number, folder: string): void {
-  db.prepare(`DELETE FROM messages_metadata WHERE mailbox_id = ? AND folder = ?`).run(
-    mailboxId,
-    folder
-  );
+  db.delete(messages)
+    .where(and(eq(messages.mailboxId, mailboxId), eq(messages.folder, folder)))
+    .run();
 }
 
 export function insertBatch(
@@ -45,106 +57,139 @@ export function insertBatch(
   uidValidity: number,
   rows: HeaderRow[]
 ): void {
-  const insert = db.prepare(
-    `INSERT INTO messages_metadata
-       (mailbox_id, folder, uid, uid_validity, message_id, subject, from_name,
-        from_address, "date", size, list_id, list_unsubscribe, dkim_domain, raw_headers)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-     ON CONFLICT (mailbox_id, folder, uid_validity, uid) DO NOTHING`
-  );
+  if (rows.length === 0) return;
 
-  db.transaction(() => {
-    for (const r of rows) {
-      insert.run(
-        mailboxId, folder, r.uid, uidValidity, r.messageId, r.subject, r.fromName,
-        r.fromAddress, r.date, r.size, r.listId, r.listUnsubscribe, r.dkimDomain,
-        r.rawHeaders
-      );
+  db.transaction((tx) => {
+    for (const row of rows) {
+      tx.insert(messages)
+        .values({ ...row, mailboxId, folder, uidValidity })
+        .onConflictDoNothing()
+        .run();
     }
-  })();
+  });
 }
 
+/** Still in the folder — moved mail is excluded from every user-facing count. */
 export function countForMailbox(mailboxId: number, folder: string): number {
   return (
     db
-      .prepare(`SELECT COUNT(*) AS n FROM messages_metadata WHERE mailbox_id = ? AND folder = ?`)
-      .get(mailboxId, folder) as { n: number }
-  ).n;
+      .select({ n: count() })
+      .from(messages)
+      .where(
+        and(
+          eq(messages.mailboxId, mailboxId),
+          eq(messages.folder, folder),
+          isNull(messages.movedAt)
+        )
+      )
+      .get()?.n ?? 0
+  );
 }
 
-/** Totals across all of a user's mailboxes. Bulk = carries List-Unsubscribe. */
+/** Totals across all of a user's mailboxes. */
 export function statsForUser(userId: string) {
-  return db
-    .prepare(
-      `SELECT COUNT(*) AS messages, COALESCE(SUM(m.list_unsubscribe IS NOT NULL), 0) AS bulk
-       FROM messages_metadata m JOIN mailboxes b ON b.id = m.mailbox_id
-       WHERE b.clerk_user_id = ?`
-    )
-    .get(userId) as { messages: number; bulk: number };
+  return (
+    db
+      .select({ messages: count(), bulk: isBulk })
+      .from(messages)
+      .innerJoin(mailboxes, eq(mailboxes.id, messages.mailboxId))
+      .where(and(eq(mailboxes.clerkUserId, userId), isNull(messages.movedAt)))
+      .get() ?? { messages: 0, bulk: 0 }
+  );
 }
-
-const DOMAIN = `lower(substr(m.from_address, instr(m.from_address, '@') + 1))`;
 
 /** One row per sender domain, biggest first. */
 export function domainGroupsForUser(userId: string) {
   return db
-    .prepare(
-      `SELECT ${DOMAIN} AS domain,
-              COUNT(DISTINCT lower(m.from_address)) AS senders,
-              COUNT(*) AS messages,
-              COALESCE(SUM(m.list_unsubscribe IS NOT NULL), 0) AS bulk,
-              MAX(m."date") AS latest
-       FROM messages_metadata m JOIN mailboxes b ON b.id = m.mailbox_id
-       WHERE b.clerk_user_id = ? AND m.from_address LIKE '%@%'
-       GROUP BY domain ORDER BY messages DESC`
+    .select({
+      domain,
+      senders: countDistinct(lower(messages.fromAddress)),
+      messages: count(),
+      bulk: isBulk,
+      latest: max(messages.date),
+    })
+    .from(messages)
+    .innerJoin(mailboxes, eq(mailboxes.id, messages.mailboxId))
+    .where(
+      and(
+        eq(mailboxes.clerkUserId, userId),
+        isNull(messages.movedAt),
+        like(messages.fromAddress, "%@%")
+      )
     )
-    .all(userId) as {
-    domain: string;
-    senders: number;
-    messages: number;
-    bulk: number;
-    latest: string | null;
-  }[];
+    .groupBy(domain)
+    .orderBy(desc(count()))
+    .all();
 }
 
 /** One row per sender address within a domain, biggest first. */
-export function addressGroupsForUser(userId: string, domain: string) {
+export function addressGroupsForUser(userId: string, dom: string) {
+  const address = lower(messages.fromAddress);
+
   return db
-    .prepare(
-      `SELECT lower(m.from_address) AS address,
-              MAX(m.from_name) AS name,
-              COUNT(*) AS messages,
-              COALESCE(SUM(m.list_unsubscribe IS NOT NULL), 0) AS bulk,
-              MAX(m."date") AS latest
-       FROM messages_metadata m JOIN mailboxes b ON b.id = m.mailbox_id
-       WHERE b.clerk_user_id = ? AND ${DOMAIN} = lower(?)
-       GROUP BY address ORDER BY messages DESC`
+    .select({
+      address,
+      name: max(messages.fromName),
+      messages: count(),
+      bulk: isBulk,
+      latest: max(messages.date),
+    })
+    .from(messages)
+    .innerJoin(mailboxes, eq(mailboxes.id, messages.mailboxId))
+    .where(
+      and(
+        eq(mailboxes.clerkUserId, userId),
+        isNull(messages.movedAt),
+        eq(domain, dom.toLowerCase())
+      )
     )
-    .all(userId, domain) as {
-    address: string;
-    name: string | null;
-    messages: number;
-    bulk: number;
-    latest: string | null;
-  }[];
+    .groupBy(address)
+    .orderBy(desc(count()))
+    .all();
 }
 
 /** Every cached message from one sender, newest first. */
 export function bySenderForUser(userId: string, address: string) {
   return db
-    .prepare(
-      `SELECT m.mailbox_id, b.email AS mailbox_email, m.uid, m.subject,
-              m.from_address, m."date"
-       FROM messages_metadata m JOIN mailboxes b ON b.id = m.mailbox_id
-       WHERE b.clerk_user_id = ? AND lower(m.from_address) = lower(?)
-       ORDER BY m."date" DESC`
+    .select({
+      mailboxId: messages.mailboxId,
+      mailboxEmail: mailboxes.email,
+      uid: messages.uid,
+      subject: messages.subject,
+      fromAddress: messages.fromAddress,
+      date: messages.date,
+    })
+    .from(messages)
+    .innerJoin(mailboxes, eq(mailboxes.id, messages.mailboxId))
+    .where(
+      and(
+        eq(mailboxes.clerkUserId, userId),
+        isNull(messages.movedAt),
+        eq(lower(messages.fromAddress), address.toLowerCase())
+      )
     )
-    .all(userId, address) as {
-    mailbox_id: number;
-    mailbox_email: string;
-    uid: number;
-    subject: string | null;
-    from_address: string | null;
-    date: string | null;
-  }[];
+    .orderBy(desc(messages.date))
+    .all();
 }
+
+/** Stamps rows as moved rather than deleting them. */
+export function markMoved(mailboxId: number, folder: string, uids: number[]): void {
+  if (uids.length === 0) return;
+
+  db.transaction((tx) => {
+    for (const uid of uids) {
+      tx.update(messages)
+        .set({ movedAt: sql`datetime('now')` })
+        .where(
+          and(
+            eq(messages.mailboxId, mailboxId),
+            eq(messages.folder, folder),
+            eq(messages.uid, uid)
+          )
+        )
+        .run();
+    }
+  });
+}
+
+export { isNotNull };

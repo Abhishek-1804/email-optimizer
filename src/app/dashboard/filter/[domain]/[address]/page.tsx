@@ -18,11 +18,11 @@ export default async function AddressPage({ params, searchParams }: Props) {
   // The list comes from the cache; only an opened body touches IMAP.
   const rows = await cachedMessages(address);
   const messages: InboxMessage[] = rows.map((r) => ({
-    mailboxId: String(r.mailbox_id),
-    mailboxEmail: r.mailbox_email,
+    mailboxId: String(r.mailboxId),
+    mailboxEmail: r.mailboxEmail,
     uid: r.uid,
     subject: r.subject ?? "(no subject)",
-    from: r.from_address ?? address,
+    from: r.fromAddress ?? address,
     date: r.date,
   }));
 

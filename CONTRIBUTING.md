@@ -21,7 +21,7 @@ it are in `todo.txt`.
 | [Next.js 16](https://nextjs.org) (App Router) + React 19 | Framework | Server components by default. `params` and `searchParams` are Promises — `await` them. |
 | [Clerk](https://clerk.com) | Sign-in only | `src/proxy.ts` protects `/dashboard`. Every server action re-checks `auth()` — middleware is not authorization. Clerk knows nothing about mailboxes. |
 | [google-auth-library](https://github.com/googleapis/google-auth-library-nodejs) | The mailbox OAuth flow | Google's own. Wrapped by `src/lib/google.ts`. Use `verifyIdToken()` rather than decoding a JWT by hand. |
-| [better-sqlite3](https://github.com/WiseLibs/better-sqlite3) | One table, holding encrypted refresh tokens | **Synchronous** — no `await` on queries. |
+| [Drizzle](https://orm.drizzle.team) + [better-sqlite3](https://github.com/WiseLibs/better-sqlite3) | Local storage | `src/lib/db/schema.ts` is the source of truth; row types are inferred from it and migrations generated from it. The driver is **synchronous** — no `await` on queries. |
 | [imapflow](https://imapflow.com) | IMAP over XOAUTH2 | Wrapped by `src/lib/imap.ts`, which is the only place a mailbox is opened. |
 | [mailparser](https://nodemailer.com/extras/mailparser/) | MIME parsing | Email is a swamp of encodings and multipart nesting. Never hand-parse it. |
 | [Tailwind v4](https://tailwindcss.com) | Styling | Configured via `postcss.config.mjs` — remove that file and the build still passes while emitting an empty stylesheet. |
@@ -39,12 +39,16 @@ silently:
   rotation: change `TOKEN_ENCRYPTION_KEY` and every stored refresh token becomes
   undecryptable. If rotation ever matters, that's when a keyring library earns
   its place, not before.
-- **No ORM, and no migration runner.** One table, a handful of queries. The
-  `.sql` file *is* the schema, replayed on boot. Change it and you delete
-  `data/app.db` and reconnect — two clicks. Both decisions get revisited when
-  the message cache lands and there's data that costs real time to rebuild; the
-  ORM candidate then is Drizzle (sync driver, types inferred from a TS schema)
-  rather than Prisma.
+- **Raw `sql` is fine where Drizzle has no helper.** SQLite string functions
+  (`lower`, `substr`, `instr`) and `coalesce(sum(x is not null), 0)` have no
+  builder equivalent, so they're declared once as named constants rather than
+  inline at each call site. Use `count()` / `countDistinct()` / `or()` / `and()`
+  where they exist — the structure should be typed even when the expression
+  isn't.
+- **Type-checking a query is not testing it.** `tsc` validates shapes, not SQL
+  semantics. It passed on a correlated subquery that failed at runtime with
+  "ambiguous column name", and again on a `LEFT JOIN` that counted phantom rows.
+  Run new queries against a scratch database with seeded rows.
 
 ---
 
@@ -87,50 +91,82 @@ Only create the folders a feature actually needs. An empty `hooks/` is noise.
 ### Where it actually is right now
 
 ```sh
-src/app/                          routing only
-  page.tsx                        landing
-  dashboard/page.tsx              thin route: mailboxes + connect link
-  dashboard/[mailboxId]/page.tsx  thin route: one inbox
-  dashboard/all/page.tsx          thin route: every inbox, merged
-  api/mailboxes/connect/route.ts  starts Google consent
-  api/mailboxes/callback/route.ts receives it, stores the refresh token
-  sign-in|sign-up/                Clerk catch-alls
+src/app/                            routing only
+  page.tsx                          landing
+  dashboard/page.tsx                mailboxes, connect link, tools
+  dashboard/[mailboxId]/page.tsx    one inbox
+  dashboard/all/page.tsx            every inbox, merged
+  dashboard/filter/page.tsx         level 1: sender domains
+  dashboard/filter/[domain]/…       level 2: addresses, level 3: messages
+  dashboard/blocklist/page.tsx      rules + the Apply button
+  api/mailboxes/connect/route.ts    starts Google consent
+  api/mailboxes/callback/route.ts   receives it, stores the refresh token
+  sign-in|sign-up/                  Clerk catch-alls
 
-src/features/mailboxes/
-  actions/disconnect-mailbox.ts
+src/features/mailboxes/             connecting, listing, syncing
+  actions/{disconnect,sync}-mailbox.ts
   components/mailbox-list.tsx
 
-src/features/messages/
+src/features/messages/              reading mail
   actions/{list-messages,get-message}.ts
   components/{inbox-view,message-list,message-viewer}.tsx
   utils/{fetch-recent,html-to-text}.ts
   types.ts
 
-src/components/ui/                button, input, card
-src/utils/cn.ts                   clsx + tailwind-merge
-src/lib/google.ts                 all Google OAuth
-src/lib/mailboxes.ts              the table, scoped to the signed-in user
-src/lib/imap.ts                   IMAP client factory + read-only wrapper
-src/lib/crypto.ts                 AES-256-GCM
-src/lib/db.ts                     SQLite, applies db/schemas/*.sql
-src/proxy.ts                      Clerk middleware, protects /dashboard
-db/schemas/001_mailboxes.sql      one table
+src/features/filtering/             grouping and blocking
+  actions/{apply-move,block-sender,unblock-sender}.ts
+  components/{spam-filter-card,spam-filter-options,block-button,apply-move-button}.tsx
+
+src/components/ui/                  button, input, card
+src/utils/cn.ts                     clsx + tailwind-merge
+
+src/lib/db/schema.ts                the schema — types and migrations both come from here
+src/lib/db/{client,mailboxes,messages,blocklist}.ts   SQL only, private to lib
+src/lib/mailboxes.ts                mailbox service: auth, tokens, IMAP creds
+src/lib/message-cache.ts            header cache service: sync in, groups out
+src/lib/blocklist.ts                rules service, and the one write (Apply)
+src/lib/google.ts                   all Google OAuth
+src/lib/imap.ts                     IMAP client factory + read-only wrapper
+src/lib/crypto.ts                   AES-256-GCM for stored refresh tokens
+src/proxy.ts                        Clerk middleware, protects /dashboard
+db/migrations/                      generated by drizzle-kit; commit them
 ```
 
-Three things worth reading as worked examples of the rules below:
+Four things worth reading as worked examples of the rules below:
 
-- **`src/lib/mailboxes.ts` is the only thing that touches its table**, and every
-  exported function scopes itself to the signed-in user. Callers never pass a
-  user id, so callers can't get the scoping wrong.
+- **`src/lib/db/` is SQL and nothing else** — no auth, no crypto, no IMAP. Every
+  function takes explicit ids; the services above it own scoping. Lint keeps it
+  private to `lib/`, so a page can never grow its own query.
+- **The lib services scope themselves.** `mailboxes.ts` and `message-cache.ts`
+  call `auth()` internally, so callers never pass a user id and can't get the
+  scoping wrong.
 - **`mailbox-list.tsx` links to `/dashboard/[mailboxId]`** instead of rendering
   the message list itself. Composition happens at the route; the mailboxes
   feature never learns the messages feature exists.
-- **The connect button is a plain `<a>`,** not a client component. It leaves the
-  app for Google, so there is nothing to manage in React.
+- **The connect button is a plain `<a>`.** It leaves the app for Google, so there
+  is nothing to manage in React — and in fact nothing in this codebase is a
+  client component yet.
 
-Deliberately absent for v0 — `config/`, `hooks/`, `types/`, and any `error.tsx`
-or `loading.tsx`. Failures currently fall through to Next's default page and
-navigation hangs silently during the IMAP round trip. Add them when hardening.
+### Schema changes
+
+`src/lib/db/schema.ts` is the source of truth. To change it:
+
+```sh
+# edit src/lib/db/schema.ts
+just db-generate      # writes db/migrations/NNNN_*.sql from the diff
+just dev              # migrate() applies it at boot
+```
+
+`just dev` warns first if the schema has drifted from the migrations. Commit the
+generated files — they're schema history, not build output — and treat them as
+append-only: once a migration has run anywhere, write a new one rather than
+editing it.
+
+Deliberately absent — `config/`, `hooks/`, `types/`, and any `error.tsx` or
+`loading.tsx`. `config/` earns its place when there are several environments to
+juggle; today it would wrap two `process.env` reads. Failures currently fall
+through to Next's default page and navigation hangs silently during the IMAP
+round trip. Add them when hardening.
 
 ---
 
@@ -217,8 +253,9 @@ import { groupBySender } from '@/features/grouping';                       // no
 | Logic only one feature uses | `src/features/<name>/` |
 | A component two features use | `src/components/` |
 | A pure function, no React, no I/O | `src/utils/` or the feature's `utils/` |
-| An env var | `src/config/` — read `process.env` in one place, not scattered |
-| A DB table or column change | `db/schemas/NNN_name.sql`. There is no migration runner: edit the file, delete `data/app.db`, reconnect |
+| An env var | Read it in the `lib/` module that needs it. `src/config/` earns its place when there are multiple environments to juggle |
+| A DB table or column change | `src/lib/db/schema.ts`, then `just db-generate` |
+| A query | `src/lib/db/<table>.ts` — never in a page or a feature |
 | A shared class string | A component in `src/components/ui/`, not a `const` you import |
 
 When torn between shared and feature-local, **start feature-local**. Promoting

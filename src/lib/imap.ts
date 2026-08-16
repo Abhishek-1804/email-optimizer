@@ -27,22 +27,23 @@ function createClient(account: ImapAccount): ImapFlow {
 }
 
 /**
- * Connects, opens a mailbox read-only, runs `fn`, always disconnects.
- *
- * `readOnly` issues EXAMINE instead of SELECT, so the server refuses writes even
- * though our OAuth scope permits deletion. Delete needs its own helper, not a
- * flag here.
- */
-/**
- * Where future "delete" operations move mail instead of deleting it, so every
- * action stays reversible from Gmail. Created eagerly; nothing writes to it yet.
+ * Where "delete" operations move mail instead of deleting it, so every action
+ * stays reversible from Gmail.
  */
 export const SAFETY_FOLDER = "email-optimizer-nextjs";
 
+/**
+ * Connects, opens a mailbox, runs `fn`, always disconnects.
+ *
+ * Read-only by default: EXAMINE instead of SELECT, so the server refuses writes
+ * even though our OAuth scope permits deletion. Passing `{ readOnly: false }` is
+ * the only way to get a writable mailbox — grep for it to find every write.
+ */
 export async function withMailbox<T>(
   account: ImapAccount,
   mailbox: string,
-  fn: (client: ImapFlow, state: MailboxState) => Promise<T>
+  fn: (client: ImapFlow, state: MailboxState) => Promise<T>,
+  options: { readOnly?: boolean } = {}
 ): Promise<T> {
   const client = createClient(account);
   await client.connect();
@@ -51,7 +52,9 @@ export async function withMailbox<T>(
     // Throws if it already exists; either way the folder is there after this.
     await client.mailboxCreate(SAFETY_FOLDER).catch(() => {});
 
-    const lock = await client.getMailboxLock(mailbox, { readOnly: true });
+    const lock = await client.getMailboxLock(mailbox, {
+      readOnly: options.readOnly ?? true,
+    });
     try {
       const box = client.mailbox;
       if (!box || typeof box === "boolean") throw new Error(`Could not open ${mailbox}`);
