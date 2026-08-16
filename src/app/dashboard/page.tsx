@@ -5,11 +5,11 @@ import { listMailboxes } from "@/lib/mailboxes";
 import MailboxList from "@/features/mailboxes/components/mailbox-list";
 
 type Props = {
-  searchParams: Promise<{ connected?: string; error?: string }>;
+  searchParams: Promise<{ connected?: string; synced?: string; error?: string }>;
 };
 
 export default async function DashboardPage({ searchParams }: Props) {
-  const { connected, error } = await searchParams;
+  const { connected, synced, error } = await searchParams;
   const mailboxes = await listMailboxes();
   const readable = mailboxes.filter((m) => m.hasMailScope);
 
@@ -23,6 +23,11 @@ export default async function DashboardPage({ searchParams }: Props) {
       {connected && (
         <p className="mb-4 rounded-lg border border-green-200 bg-green-50 p-3 text-sm text-green-800">
           Connected {connected}.
+        </p>
+      )}
+      {synced && (
+        <p className="mb-4 rounded-lg border border-green-200 bg-green-50 p-3 text-sm text-green-800">
+          {synced}
         </p>
       )}
       {error && (

@@ -13,6 +13,9 @@ const db = new Database(path.join(dataDir, "app.db"));
 // of failing with SQLITE_BUSY.
 db.pragma("busy_timeout = 5000");
 
+// Off by default in SQLite; without it every REFERENCES/CASCADE is inert.
+db.pragma("foreign_keys = ON");
+
 // The busy timeout does not cover a journal-mode switch — SQLite refuses that
 // outright while another connection is open — so take WAL only if we can.
 try {
