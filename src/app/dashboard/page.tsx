@@ -2,14 +2,23 @@ import Link from "next/link";
 import { UserButton } from "@clerk/nextjs";
 import { buttonClasses } from "@/components/ui/button";
 import { listMailboxes } from "@/lib/mailboxes";
+import { cacheStats } from "@/lib/message-cache";
 import MailboxList from "@/features/mailboxes/components/mailbox-list";
+import SpamFilterCard from "@/features/filtering/components/spam-filter-card";
+import SpamFilterOptions from "@/features/filtering/components/spam-filter-options";
 
 type Props = {
-  searchParams: Promise<{ connected?: string; synced?: string; error?: string }>;
+  searchParams: Promise<{
+    connected?: string;
+    synced?: string;
+    error?: string;
+    feature?: string;
+  }>;
 };
 
 export default async function DashboardPage({ searchParams }: Props) {
-  const { connected, synced, error } = await searchParams;
+  const { connected, synced, error, feature } = await searchParams;
+  const stats = await cacheStats();
   const mailboxes = await listMailboxes();
   const readable = mailboxes.filter((m) => m.hasMailScope);
 
@@ -59,6 +68,22 @@ export default async function DashboardPage({ searchParams }: Props) {
           Connect a Gmail account
         </Link>
       </section>
+
+      <section className="mt-8">
+        <h2 className="mb-3 text-lg font-semibold">Tools</h2>
+        <div className="grid items-start gap-3 md:grid-cols-[minmax(0,300px)_1fr]">
+          <SpamFilterCard selected={feature === "spam"} stats={stats} />
+          {feature === "spam" && <SpamFilterOptions />}
+        </div>
+      </section>
+
+      <p className="mt-8 max-w-2xl rounded-lg border border-gray-200 bg-gray-50 p-3 text-xs text-gray-500">
+        Working with email has destructive implications, so this app never
+        deletes anything. A folder named{" "}
+        <code className="rounded bg-gray-100 px-1">email-optimizer-nextjs</code>{" "}
+        is created in each connected mailbox, and any future &quot;delete&quot;
+        will simply move messages there — recoverable from Gmail at any time.
+      </p>
     </div>
   );
 }

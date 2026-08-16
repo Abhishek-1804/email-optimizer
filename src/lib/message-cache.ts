@@ -1,3 +1,4 @@
+import { auth } from "@clerk/nextjs/server";
 import db from "@/lib/db";
 import { withMailbox } from "@/lib/imap";
 import { loadImapCreds } from "@/lib/mailboxes";
@@ -114,4 +115,100 @@ export async function syncMailbox(mailboxId: string): Promise<SyncResult> {
 
     return { email: creds.email, fetched: rows.length, total, reset };
   });
+}
+
+export type CacheStats = { messages: number; bulk: number };
+
+/** Synced totals for the signed-in user. Bulk = carries List-Unsubscribe. */
+export async function cacheStats(): Promise<CacheStats> {
+  const { userId } = await auth();
+  if (!userId) return { messages: 0, bulk: 0 };
+
+  const row = db
+    .prepare(
+      `SELECT COUNT(*) AS messages, COALESCE(SUM(m.list_unsubscribe IS NOT NULL), 0) AS bulk
+       FROM messages_metadata m JOIN mailboxes b ON b.id = m.mailbox_id
+       WHERE b.clerk_user_id = ?`
+    )
+    .get(userId) as CacheStats;
+
+  return row;
+}
+
+const DOMAIN_SQL = `lower(substr(m.from_address, instr(m.from_address, '@') + 1))`;
+
+export type DomainGroup = {
+  domain: string;
+  senders: number;
+  messages: number;
+  bulk: number;
+  latest: string | null;
+};
+
+export async function domainGroups(): Promise<DomainGroup[]> {
+  const { userId } = await auth();
+  if (!userId) return [];
+
+  return db
+    .prepare(
+      `SELECT ${DOMAIN_SQL} AS domain,
+              COUNT(DISTINCT lower(m.from_address)) AS senders,
+              COUNT(*) AS messages,
+              COALESCE(SUM(m.list_unsubscribe IS NOT NULL), 0) AS bulk,
+              MAX(m."date") AS latest
+       FROM messages_metadata m JOIN mailboxes b ON b.id = m.mailbox_id
+       WHERE b.clerk_user_id = ? AND m.from_address LIKE '%@%'
+       GROUP BY domain ORDER BY messages DESC`
+    )
+    .all(userId) as DomainGroup[];
+}
+
+export type AddressGroup = {
+  address: string;
+  name: string | null;
+  messages: number;
+  bulk: number;
+  latest: string | null;
+};
+
+export async function addressGroups(domain: string): Promise<AddressGroup[]> {
+  const { userId } = await auth();
+  if (!userId) return [];
+
+  return db
+    .prepare(
+      `SELECT lower(m.from_address) AS address,
+              MAX(m.from_name) AS name,
+              COUNT(*) AS messages,
+              COALESCE(SUM(m.list_unsubscribe IS NOT NULL), 0) AS bulk,
+              MAX(m."date") AS latest
+       FROM messages_metadata m JOIN mailboxes b ON b.id = m.mailbox_id
+       WHERE b.clerk_user_id = ? AND ${DOMAIN_SQL} = lower(?)
+       GROUP BY address ORDER BY messages DESC`
+    )
+    .all(userId, domain) as AddressGroup[];
+}
+
+export type CachedMessage = {
+  mailbox_id: number;
+  mailbox_email: string;
+  uid: number;
+  subject: string | null;
+  from_address: string | null;
+  date: string | null;
+};
+
+export async function cachedMessages(address: string): Promise<CachedMessage[]> {
+  const { userId } = await auth();
+  if (!userId) return [];
+
+  return db
+    .prepare(
+      `SELECT m.mailbox_id, b.email AS mailbox_email, m.uid, m.subject,
+              m.from_address, m."date"
+       FROM messages_metadata m JOIN mailboxes b ON b.id = m.mailbox_id
+       WHERE b.clerk_user_id = ? AND lower(m.from_address) = lower(?)
+       ORDER BY m."date" DESC`
+    )
+    .all(userId, address) as CachedMessage[];
 }

@@ -33,6 +33,12 @@ function createClient(account: ImapAccount): ImapFlow {
  * though our OAuth scope permits deletion. Delete needs its own helper, not a
  * flag here.
  */
+/**
+ * Where future "delete" operations move mail instead of deleting it, so every
+ * action stays reversible from Gmail. Created eagerly; nothing writes to it yet.
+ */
+export const SAFETY_FOLDER = "email-optimizer-nextjs";
+
 export async function withMailbox<T>(
   account: ImapAccount,
   mailbox: string,
@@ -42,6 +48,9 @@ export async function withMailbox<T>(
   await client.connect();
 
   try {
+    // Throws if it already exists; either way the folder is there after this.
+    await client.mailboxCreate(SAFETY_FOLDER).catch(() => {});
+
     const lock = await client.getMailboxLock(mailbox, { readOnly: true });
     try {
       const box = client.mailbox;

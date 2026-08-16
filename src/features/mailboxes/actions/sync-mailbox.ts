@@ -6,7 +6,7 @@ import { listMailboxes, imapError } from "@/lib/mailboxes";
 import { syncMailbox as sync } from "@/lib/message-cache";
 
 function done(message: string): never {
-  revalidatePath("/dashboard");
+  revalidatePath("/", "layout");
   redirect(`/dashboard?synced=${encodeURIComponent(message)}`);
 }
 

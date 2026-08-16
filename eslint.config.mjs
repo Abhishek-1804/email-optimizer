@@ -54,6 +54,11 @@ const eslintConfig = defineConfig([
               from: './src/features',
               except: ['./messages'],
             },
+            {
+              target: './src/features/filtering',
+              from: './src/features',
+              except: ['./filtering'],
+            },
           ],
         },
       ],

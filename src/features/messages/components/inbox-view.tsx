@@ -6,6 +6,8 @@ import type { InboxMessage, InboxResult, MessageDetail } from "../types";
 type Props = {
   title: string;
   subtitle?: string;
+  backHref?: string;
+  backLabel?: string;
   result: InboxResult;
   selected: { mailboxId: string; uid: number } | null;
   message: MessageDetail | null;
@@ -17,6 +19,8 @@ type Props = {
 export default function InboxView({
   title,
   subtitle,
+  backHref = "/dashboard",
+  backLabel = "← Back to mailboxes",
   result,
   selected,
   message,
@@ -26,8 +30,8 @@ export default function InboxView({
   return (
     <div className="mx-auto flex h-screen max-w-6xl flex-col p-8">
       <header className="mb-4">
-        <Link href="/dashboard" className="text-sm text-gray-500 hover:text-gray-900">
-          ← Back to mailboxes
+        <Link href={backHref} className="text-sm text-gray-500 hover:text-gray-900">
+          {backLabel}
         </Link>
         <h1 className="mt-1 text-2xl font-semibold">{title}</h1>
         {subtitle && <p className="text-sm text-gray-500">{subtitle}</p>}

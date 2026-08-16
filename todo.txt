@@ -1,1 +1,17 @@
-featureflags
+DELETE SAFETY — the rule until launch:
+- never delete real mail. Real deletion stays behind a feature flag until the
+  very last moment.
+- until then, every "delete" operation instead MOVES messages to a folder named
+  "email-optimizer-nextjs" in the user's own mailbox, so every action is
+  reversible from Gmail itself. Not implemented yet — this is the contract for
+  when it is.
+- withMailbox stays EXAMINE/read-only; the move operation gets its own
+  explicitly-named read-write helper when it lands.
+
+spam filtering drill-down (current work):
+- dashboard card -> options panel (done: card + panel)
+- level 1: groups by sender domain (dkim_domain / from domain)
+- level 2: within a domain, groups by full from_address
+- level 3: message list view — the user reviews before anything is acted on
+- at most 2-3 levels of granularity before the message list
+- manual block list option: later
