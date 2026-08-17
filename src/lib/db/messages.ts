@@ -63,7 +63,13 @@ export function insertBatch(
     for (const row of rows) {
       tx.insert(messages)
         .values({ ...row, mailboxId, folder, uidValidity })
-        .onConflictDoNothing()
+        // A message dragged back from the safety folder returns with a new uid,
+        // so it looks new. Message-ID identifies it: update where it now lives
+        // and clear moved_at, rather than adding a second row.
+        .onConflictDoUpdate({
+          target: [messages.mailboxId, messages.messageId],
+          set: { uid: sql`excluded.uid`, movedAt: sql`NULL` },
+        })
         .run();
     }
   });

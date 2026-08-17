@@ -66,6 +66,9 @@ export const messages = sqliteTable(
   },
   (t) => [
     unique("messages_uid").on(t.mailboxId, t.folder, t.uidValidity, t.uid),
+    // Message-ID travels with the message; uid does not. Moving mail out and
+    // back gives it a new uid each time, so this is what identifies it.
+    unique("messages_message_id").on(t.mailboxId, t.messageId),
     index("idx_messages_group").on(t.mailboxId, t.groupKey),
     index("idx_messages_date").on(t.mailboxId, t.date),
     index("idx_messages_pending").on(t.mailboxId, t.movedAt),

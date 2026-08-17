@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX `messages_message_id` ON `messages_metadata` (`mailbox_id`,`message_id`);
