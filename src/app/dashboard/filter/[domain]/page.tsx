@@ -1,5 +1,6 @@
 import Link from "next/link";
 import Card from "@/components/ui/card";
+import JunkScore from "@/features/filtering/components/junk-score";
 import { addressGroups } from "@/lib/message-cache";
 import { activeRules } from "@/lib/blocklist";
 import BlockButton from "@/features/filtering/components/block-button";
@@ -44,7 +45,8 @@ export default async function DomainPage({ params }: Props) {
                     {g.bulk} bulk
                   </span>
                 )}
-                <span className="font-medium tabular-nums">{g.messages}</span>
+                <JunkScore score={g.score} />
+                  <span className="font-medium tabular-nums">{g.messages}</span>
                 <BlockButton
                   kind="address"
                   value={g.address}

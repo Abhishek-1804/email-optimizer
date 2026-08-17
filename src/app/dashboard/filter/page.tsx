@@ -1,5 +1,7 @@
 import Link from "next/link";
 import Card from "@/components/ui/card";
+import JunkScore from "@/features/filtering/components/junk-score";
+import ScoreExplainer from "@/features/filtering/components/score-explainer";
 import { domainGroups } from "@/lib/message-cache";
 import { activeRules } from "@/lib/blocklist";
 import BlockButton from "@/features/filtering/components/block-button";
@@ -15,20 +17,11 @@ export default async function FilterPage() {
         ← Back to tools
       </Link>
       <h1 className="mt-1 text-2xl font-semibold">Grouped by sender domain</h1>
-      <p className="text-sm text-gray-500">
-        {groups.length} domains across your synced mail. Click one to see its senders.
+      <p className="mb-3 text-sm text-gray-500">
+        {groups.length} domains, ordered by how much bulk mail each one sends
+        you. Click one to see its senders.
       </p>
-      <p className="mt-2 mb-4 max-w-2xl rounded-lg border border-gray-200 bg-gray-50 p-3 text-xs text-gray-500">
-        <span className="font-medium text-gray-600">How this is detected:</span>{" "}
-        messages are grouped by the domain in their{" "}
-        <code className="rounded bg-gray-100 px-1">From</code> header, and the{" "}
-        <span className="rounded bg-amber-100 px-1 text-amber-800">bulk</span>{" "}
-        count is messages carrying a{" "}
-        <code className="rounded bg-gray-100 px-1">List-Unsubscribe</code>{" "}
-        header — legitimate bulk senders are required to include it, so
-        newsletters and promos declare themselves. DKIM signatures are synced
-        too, for smarter grouping later.
-      </p>
+      <ScoreExplainer />
 
       {groups.length === 0 ? (
         <p className="text-gray-500">Nothing synced yet — sync a mailbox first.</p>
@@ -53,6 +46,7 @@ export default async function FilterPage() {
                       {g.bulk} bulk
                     </span>
                   )}
+                  <JunkScore score={g.score} />
                   <span className="font-medium tabular-nums">{g.messages}</span>
                   <BlockButton
                     kind="domain"

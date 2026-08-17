@@ -18,8 +18,36 @@ const lower = (col: unknown) => sql<string>`lower(${col})`;
 /** The sender domain, derived in SQL so grouping never needs a second pass. */
 const domain = sql<string>`lower(substr(${messages.fromAddress}, instr(${messages.fromAddress}, '@') + 1))`;
 
-/** Carries List-Unsubscribe — how bulk mail declares itself. */
-const isBulk = sql<number>`coalesce(sum(${messages.listUnsubscribe} is not null), 0)`;
+/**
+ * How machine-generated a message looks, from the headers bulk senders set.
+ * In-Reply-To subtracts: a message in a reply chain is a conversation, which is
+ * what separates people from machines on shared domains like gmail.com.
+ *
+ * Defined once and averaged per group, so the badge and the sort order can
+ * never disagree.
+ */
+const bulkScore = sql<number>`(
+    (CASE WHEN ${messages.listId} IS NOT NULL THEN 3 ELSE 0 END)
+  + (CASE WHEN ${messages.listUnsubscribe} IS NOT NULL THEN 3 ELSE 0 END)
+  + (CASE WHEN lower(${messages.rawHeaders}) LIKE '%list-unsubscribe-post%' THEN 2 ELSE 0 END)
+  + (CASE WHEN lower(${messages.rawHeaders}) LIKE '%feedback-id:%' THEN 2 ELSE 0 END)
+  + (CASE WHEN lower(${messages.rawHeaders}) LIKE '%precedence: bulk%'
+            OR lower(${messages.rawHeaders}) LIKE '%precedence: list%' THEN 1 ELSE 0 END)
+  + (CASE WHEN lower(${messages.rawHeaders}) LIKE '%auto-submitted:%'
+           AND lower(${messages.rawHeaders}) NOT LIKE '%auto-submitted: no%' THEN 1 ELSE 0 END)
+  - (CASE WHEN lower(${messages.rawHeaders}) LIKE '%in-reply-to:%' THEN 3 ELSE 0 END)
+)`;
+
+/** Mean score across a group, rounded to one decimal. Shown on the row. */
+const avgScore = sql<number>`round(avg(${bulkScore}), 1)`;
+
+/**
+ * Messages in a group that look like junk. This is what the lists sort by —
+ * "how much would blocking this remove", not "how junky is the junkiest".
+ * Sorting by the mean instead floats one-message senders with a perfect score
+ * above a sender with 646 real ones.
+ */
+const junkCount = sql<number>`coalesce(sum(CASE WHEN ${bulkScore} >= 3 THEN 1 ELSE 0 END), 0)`;
 
 /**
  * Where a sync should resume from, and which UID generation the cache holds.
@@ -96,7 +124,7 @@ export function countForMailbox(mailboxId: number, folder: string): number {
 export function statsForUser(userId: string) {
   return (
     db
-      .select({ messages: count(), bulk: isBulk })
+      .select({ messages: count(), bulk: junkCount })
       .from(messages)
       .innerJoin(mailboxes, eq(mailboxes.id, messages.mailboxId))
       .where(and(eq(mailboxes.clerkUserId, userId), isNull(messages.movedAt)))
@@ -111,7 +139,8 @@ export function domainGroupsForUser(userId: string) {
       domain,
       senders: countDistinct(lower(messages.fromAddress)),
       messages: count(),
-      bulk: isBulk,
+      bulk: junkCount,
+      score: avgScore,
       latest: max(messages.date),
     })
     .from(messages)
@@ -124,7 +153,7 @@ export function domainGroupsForUser(userId: string) {
       )
     )
     .groupBy(domain)
-    .orderBy(desc(count()))
+    .orderBy(desc(junkCount), desc(count()))
     .all();
 }
 
@@ -137,7 +166,8 @@ export function addressGroupsForUser(userId: string, dom: string) {
       address,
       name: max(messages.fromName),
       messages: count(),
-      bulk: isBulk,
+      bulk: junkCount,
+      score: avgScore,
       latest: max(messages.date),
     })
     .from(messages)
@@ -150,7 +180,7 @@ export function addressGroupsForUser(userId: string, dom: string) {
       )
     )
     .groupBy(address)
-    .orderBy(desc(count()))
+    .orderBy(desc(junkCount), desc(count()))
     .all();
 }
 
