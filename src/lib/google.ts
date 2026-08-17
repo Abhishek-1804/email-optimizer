@@ -77,19 +77,41 @@ export async function exchangeCode(
   };
 }
 
-/** Mints a short-lived access token. Called per request; nothing is cached. */
+/**
+ * Access tokens last about an hour, so they're cached in memory for their
+ * lifetime — otherwise every IMAP operation pays a round trip to Google before
+ * it can open a socket.
+ *
+ * In memory rather than in the database on purpose: a second live credential on
+ * disk is a liability, and a process restart simply re-mints.
+ */
+const tokenCache = new Map<string, { token: string; expiresAt: number }>();
+
+/** Renew this long before expiry, so a token can't die mid-IMAP-session. */
+const RENEW_BEFORE_MS = 5 * 60_000;
+
+/** Mints a short-lived access token, or returns a cached one still in date. */
 export async function accessTokenFor(refreshToken: string): Promise<string> {
+  const cached = tokenCache.get(refreshToken);
+  if (cached && cached.expiresAt - RENEW_BEFORE_MS > Date.now()) return cached.token;
+
   const oauth = client("");
   oauth.setCredentials({ refresh_token: refreshToken });
 
   const { token } = await oauth.getAccessToken();
   if (!token) throw new Error("Could not refresh access to this mailbox");
 
+  // Google returns expiry_date as epoch ms; fall back to a conservative hour.
+  const expiresAt = oauth.credentials.expiry_date ?? Date.now() + 60 * 60_000;
+  tokenCache.set(refreshToken, { token, expiresAt });
+
   return token;
 }
 
 /** Best-effort revoke, so disconnecting actually ends the grant at Google. */
 export async function revokeToken(refreshToken: string): Promise<void> {
+  tokenCache.delete(refreshToken);
+
   try {
     await client("").revokeToken(refreshToken);
   } catch {
