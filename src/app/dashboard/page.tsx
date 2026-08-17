@@ -4,6 +4,7 @@ import { buttonClasses } from "@/components/ui/button";
 import { listMailboxes } from "@/lib/mailboxes";
 import { cacheStats } from "@/lib/message-cache";
 import MailboxList from "@/features/mailboxes/components/mailbox-list";
+import ConnectMailbox from "@/features/mailboxes/components/connect-mailbox";
 import SpamFilterCard from "@/features/filtering/components/spam-filter-card";
 import SpamFilterOptions from "@/features/filtering/components/spam-filter-options";
 
@@ -57,16 +58,7 @@ export default async function DashboardPage({ searchParams }: Props) {
       </section>
 
       <section>
-        <h2 className="mb-3 text-lg font-semibold">Connect a mailbox</h2>
-        <p className="mb-3 max-w-md text-sm text-gray-500">
-          Google will ask you to approve access, and you can pick any account —
-          connect as many as you like. Revoke any of them from your Google
-          account at any time.
-        </p>
-        {/* A plain link, not a button: this leaves the app for Google. */}
-        <Link href="/api/mailboxes/connect" prefetch={false} className={buttonClasses()}>
-          Connect a Gmail account
-        </Link>
+        <ConnectMailbox />
       </section>
 
       <section className="mt-8">
