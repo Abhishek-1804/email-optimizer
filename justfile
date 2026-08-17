@@ -26,6 +26,12 @@ db-check:
 build:
     npm run build
 
+# Useful when dev-mode styling looks wrong: this is the output that ships.
+#
+# Build, then serve it on :3000.
+start: build
+    npm run start
+
 # Lint with ESLint (flat config).
 lint:
     npm run lint
