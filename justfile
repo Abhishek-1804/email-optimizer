@@ -10,8 +10,12 @@ export PATH := bin_dir + ":" + env_var('PATH')
 install-deps:
     ./hack/install-deps.sh
 
-# Run the Next.js dev server. Warns first if schema.ts needs a new migration.
-dev: install-deps db-check
+# Everything a server needs before it starts: the toolchain, npm deps, and a
+# warning if schema.ts needs a new migration.
+setup: install-deps db-check
+
+# Run the Next.js dev server.
+dev: setup
     npm run dev
 
 # Write a migration for whatever changed in src/lib/db/schema.ts.
@@ -22,8 +26,8 @@ db-generate:
 db-check:
     ./hack/check-schema.sh
 
-# Production build. Warns first if schema.ts needs a new migration.
-build: install-deps db-check
+# Production build.
+build: setup
     npm run build
 
 # Useful when dev-mode styling looks wrong: this is the output that ships.
