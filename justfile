@@ -22,8 +22,8 @@ db-generate:
 db-check:
     ./hack/check-schema.sh
 
-# Production build.
-build:
+# Production build. Warns first if schema.ts needs a new migration.
+build: install-deps db-check
     npm run build
 
 # Useful when dev-mode styling looks wrong: this is the output that ships.
@@ -41,7 +41,7 @@ lint:
 #
 # Remove regenerable files (deps, lockfile, build output, IDE, bin).
 clean:
-    rm -rf node_modules .next out build coverage .idea .vscode
+    rm -rf node_modules .next out build coverage .vscode
     rm -f package-lock.json ./*.tsbuildinfo next-env.d.ts ./*.log
     find . -name .DS_Store -not -path "./.git/*" -delete
     rm -rf "{{bin_dir}}"
