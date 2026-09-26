@@ -1,14 +1,10 @@
 import crypto from "crypto";
+import { env } from "@/config/env";
 
 const ALGORITHM = "aes-256-gcm";
 
 function getKey(): Buffer {
-  const key = process.env.TOKEN_ENCRYPTION_KEY;
-  if (!key) {
-    throw new Error("TOKEN_ENCRYPTION_KEY is not set");
-  }
-
-  const keyBuffer = Buffer.from(key, "base64");
+  const keyBuffer = Buffer.from(env.tokenEncryptionKey, "base64");
   if (keyBuffer.length !== 32) {
     throw new Error("TOKEN_ENCRYPTION_KEY must decode to 32 bytes");
   }

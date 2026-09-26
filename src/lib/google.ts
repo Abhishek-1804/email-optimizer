@@ -1,4 +1,5 @@
 import { OAuth2Client } from "google-auth-library";
+import { env } from "@/config/env";
 
 // Google OAuth for mailbox access. Clerk owns sign-in; this owns a separate
 // grant with its own consent screen, so signing in never asks for mail access.
@@ -10,14 +11,11 @@ export const GMAIL_SCOPE = "https://mail.google.com/";
 const SCOPES = ["openid", "email", GMAIL_SCOPE];
 
 function client(redirectUri: string): OAuth2Client {
-  const clientId = process.env.GOOGLE_CLIENT_ID;
-  const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
-
-  if (!clientId || !clientSecret) {
-    throw new Error("GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET must be set");
-  }
-
-  return new OAuth2Client({ clientId, clientSecret, redirectUri });
+  return new OAuth2Client({
+    clientId: env.googleClientId,
+    clientSecret: env.googleClientSecret,
+    redirectUri,
+  });
 }
 
 /**
@@ -64,7 +62,7 @@ export async function exchangeCode(
   // Verified, not decoded: checks Google's signature and our client id.
   const ticket = await oauth.verifyIdToken({
     idToken: tokens.id_token,
-    audience: process.env.GOOGLE_CLIENT_ID,
+    audience: env.googleClientId,
   });
 
   const email = ticket.getPayload()?.email;

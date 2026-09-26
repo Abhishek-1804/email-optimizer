@@ -121,6 +121,9 @@ src/features/filtering/             grouping and blocking
 src/components/ui/                  button, input, card
 src/utils/cn.ts                     clsx + tailwind-merge
 
+src/config/env.ts                   every env var, as checked getters; server-only
+src/config/billing.ts               Clerk Billing feature slugs
+
 src/lib/db/schema.ts                the schema — types and migrations both come from here
 src/lib/db/{client,mailboxes,messages,blocklist}.ts   SQL only, private to lib
 src/lib/mailboxes.ts                mailbox service: auth, tokens, IMAP creds
@@ -163,11 +166,8 @@ generated files — they're schema history, not build output — and treat them 
 append-only: once a migration has run anywhere, write a new one rather than
 editing it.
 
-Deliberately absent — `config/`, `hooks/`, `types/`, and any `error.tsx` or
-`loading.tsx`. `config/` earns its place when there are several environments to
-juggle; today it would wrap two `process.env` reads. Failures currently fall
-through to Next's default page and navigation hangs silently during the IMAP
-round trip. Add them when hardening.
+Deliberately absent — `hooks/`, `types/`, and any `error.tsx`. Failures currently
+fall through to Next's default page. Add them when hardening.
 
 ---
 
@@ -254,7 +254,8 @@ import { groupBySender } from '@/features/grouping';                       // no
 | Logic only one feature uses | `src/features/<name>/` |
 | A component two features use | `src/components/` |
 | A pure function, no React, no I/O | `src/utils/` or the feature's `utils/` |
-| An env var | Read it in the `lib/` module that needs it. `src/config/` earns its place when there are multiple environments to juggle |
+| An env var | A getter in `src/config/env.ts` — never `process.env` directly. Server-only |
+| A plan or feature slug | `src/config/billing.ts` |
 | A DB table or column change | `src/lib/db/schema.ts`, then `just db-generate` |
 | A query | `src/lib/db/<table>.ts` — never in a page or a feature |
 | A shared class string | A component in `src/components/ui/`, not a `const` you import |

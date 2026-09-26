@@ -41,6 +41,7 @@ const eslintConfig = defineConfig([
             {
               target: [
                 './src/components',
+                './src/config',
                 './src/hooks',
                 './src/lib',
                 './src/types',
