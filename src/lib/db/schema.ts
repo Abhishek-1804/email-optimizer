@@ -84,7 +84,12 @@ export const blocklist = sqliteTable(
   {
     id: integer("id").primaryKey({ autoIncrement: true }),
     clerkUserId: text("clerk_user_id").notNull(),
-    kind: text("kind", { enum: ["domain", "address"] }).notNull(),
+    /**
+     * `domain` and `address` are exact, lowercased. `pattern` is a regular
+     * expression the user typed, stored verbatim and searched for anywhere in
+     * the sender address, case-insensitively — see `regexp` in db/client.
+     */
+    kind: text("kind", { enum: ["domain", "address", "pattern"] }).notNull(),
     value: text("value").notNull(),
     createdAt: text("created_at").notNull().default(sql`(datetime('now'))`),
   },

@@ -27,6 +27,24 @@ try {
   // Another worker won the race; it leaves the database in WAL anyway.
 }
 
+// SQLite parses `x REGEXP y` but ships no implementation; it calls a
+// user-defined regexp(y, x). Registering one here means pattern rules are
+// matched in SQL, by the same query that counts them and the one Apply moves.
+// Case-insensitive, unanchored — a search, not a full match. A pattern that
+// fails to compile matches nothing rather than failing the whole query.
+const compiled = new Map<string, RegExp | null>();
+sqlite.function("regexp", { deterministic: true }, (pattern, value) => {
+  if (typeof pattern !== "string" || typeof value !== "string") return 0;
+  if (!compiled.has(pattern)) {
+    try {
+      compiled.set(pattern, new RegExp(pattern, "i"));
+    } catch {
+      compiled.set(pattern, null);
+    }
+  }
+  return compiled.get(pattern)?.test(value) ? 1 : 0;
+});
+
 const db = drizzle(sqlite, { schema });
 
 // Applies db/migrations in order, once each, tracked by drizzle in its own

@@ -1,16 +1,23 @@
 import Link from "next/link";
 import Button from "@/components/ui/button";
 import Card from "@/components/ui/card";
-import { listRules } from "@/lib/blocklist";
+import { listRules, pendingCount } from "@/lib/blocklist";
 import { unblockSenderAction } from "@/features/filtering/actions/unblock-sender";
 import ApplyMoveButton from "@/features/filtering/components/apply-move-button";
+import PatternForm from "@/features/filtering/components/pattern-form";
 
-type Props = { searchParams: Promise<{ applied?: string; error?: string }> };
+type Props = { searchParams: Promise<{ notice?: string; error?: string }> };
+
+const KIND_LABEL = {
+  domain: "whole domain",
+  address: "single address",
+  pattern: "pattern",
+} as const;
 
 export default async function BlocklistPage({ searchParams }: Props) {
-  const { applied, error } = await searchParams;
+  const { notice, error } = await searchParams;
   const rules = await listRules();
-  const pending = rules.reduce((n, r) => n + r.matches, 0);
+  const pending = await pendingCount();
 
   return (
     <div className="mx-auto max-w-3xl p-8">
@@ -24,9 +31,9 @@ export default async function BlocklistPage({ searchParams }: Props) {
         each mailbox. Nothing is deleted — you can move it back from Gmail.
       </p>
 
-      {applied && (
+      {notice && (
         <p className="mb-4 rounded-lg border border-green-200 bg-green-50 p-3 text-sm text-green-800">
-          {applied}
+          {notice}
         </p>
       )}
       {error && (
@@ -35,9 +42,14 @@ export default async function BlocklistPage({ searchParams }: Props) {
         </p>
       )}
 
+      <Card className="mb-6">
+        <PatternForm />
+      </Card>
+
       {rules.length === 0 ? (
         <p className="text-gray-500">
-          Nothing blocked yet. Use the Block buttons while browsing{" "}
+          Nothing blocked yet. Add a pattern above, or use the Block buttons while
+          browsing{" "}
           <Link href="/dashboard/filter" className="underline">
             grouped senders
           </Link>
@@ -45,8 +57,13 @@ export default async function BlocklistPage({ searchParams }: Props) {
         </p>
       ) : (
         <>
-          <div className="mb-4">
+          <div className="mb-4 flex items-center gap-3">
             <ApplyMoveButton pending={pending} />
+            {pending > 0 && (
+              <Link href="/dashboard/blocklist/review" className="text-sm underline">
+                Review all {pending.toLocaleString()}
+              </Link>
+            )}
           </div>
 
           <ul className="flex flex-col gap-2">
@@ -54,14 +71,29 @@ export default async function BlocklistPage({ searchParams }: Props) {
               <li key={r.id}>
                 <Card className="flex items-center justify-between gap-3">
                   <div className="min-w-0">
-                    <div className="truncate font-medium">{r.value}</div>
-                    <div className="text-xs text-gray-500">
-                      {r.kind === "domain" ? "whole domain" : "single address"}
+                    <div
+                      className={
+                        r.kind === "pattern"
+                          ? "truncate font-mono text-sm font-medium"
+                          : "truncate font-medium"
+                      }
+                    >
+                      {r.value}
                     </div>
+                    <div className="text-xs text-gray-500">{KIND_LABEL[r.kind]}</div>
                   </div>
                   <div className="flex shrink-0 items-center gap-2 text-sm">
                     <span className="tabular-nums text-gray-500">
-                      {r.matches} pending
+                      {r.matches > 0 ? (
+                        <Link
+                          href={`/dashboard/blocklist/review?rule=${r.id}`}
+                          className="underline hover:text-gray-900"
+                        >
+                          {r.matches} pending
+                        </Link>
+                      ) : (
+                        "0 pending"
+                      )}
                       {r.moved > 0 && ` · ${r.moved} moved`}
                     </span>
                     <form action={unblockSenderAction}>

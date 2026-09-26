@@ -51,7 +51,7 @@ export default async function DomainPage({ params }: Props) {
                   kind="address"
                   value={g.address}
                   back={back}
-                  blocked={rules.addresses.has(g.address)}
+                  blocked={rules.blocksAddress(g.address)}
                 />
               </div>
             </Card>

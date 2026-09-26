@@ -1,10 +1,10 @@
-import { and, desc, eq, isNotNull, isNull, or, sql } from "drizzle-orm";
+import { and, countDistinct, desc, eq, isNotNull, isNull, or, sql } from "drizzle-orm";
 import db from "./client";
 import { blocklist, mailboxes, messages } from "./schema";
 
 // SQL for the blocklist table. Explicit ids in, rows out.
 
-export type BlockKind = "domain" | "address";
+export type BlockKind = "domain" | "address" | "pattern";
 
 export type BlockRule = {
   id: number;
@@ -27,7 +27,8 @@ const domain = sql<string>`lower(substr(${messages.fromAddress}, instr(${message
  */
 const matchesRule = or(
   and(eq(blocklist.kind, "address"), eq(blocklist.value, address)),
-  and(eq(blocklist.kind, "domain"), eq(blocklist.value, domain))
+  and(eq(blocklist.kind, "domain"), eq(blocklist.value, domain)),
+  and(eq(blocklist.kind, "pattern"), sql`${messages.fromAddress} regexp ${blocklist.value}`)
 )!;
 
 /**
@@ -59,10 +60,14 @@ export function listForUser(userId: string): BlockRule[] {
     .all();
 }
 
-/** Idempotent: the unique constraint makes a repeat click a no-op. */
+/**
+ * Idempotent: the unique constraint makes a repeat click a no-op. Patterns are
+ * stored verbatim — lowercasing `\S` would turn it into `\s` — and match
+ * case-insensitively instead.
+ */
 export function add(userId: string, kind: BlockKind, value: string): void {
   db.insert(blocklist)
-    .values({ clerkUserId: userId, kind, value: value.toLowerCase() })
+    .values({ clerkUserId: userId, kind, value: kind === "pattern" ? value : value.toLowerCase() })
     .onConflictDoNothing()
     .run();
 }
@@ -73,8 +78,12 @@ export function remove(userId: string, id: number): void {
     .run();
 }
 
-/** Lowercased addresses and domains, for badging rows in the drill-down. */
-export function rulesForUser(userId: string): { addresses: Set<string>; domains: Set<string> } {
+/** Lowercased addresses and domains, and raw patterns, for badging rows in the drill-down. */
+export function rulesForUser(userId: string): {
+  addresses: Set<string>;
+  domains: Set<string>;
+  patterns: string[];
+} {
   const rows = db
     .select({ kind: blocklist.kind, value: blocklist.value })
     .from(blocklist)
@@ -84,7 +93,61 @@ export function rulesForUser(userId: string): { addresses: Set<string>; domains:
   return {
     addresses: new Set(rows.filter((r) => r.kind === "address").map((r) => r.value)),
     domains: new Set(rows.filter((r) => r.kind === "domain").map((r) => r.value)),
+    patterns: rows.filter((r) => r.kind === "pattern").map((r) => r.value),
   };
+}
+
+/** Cached messages matching at least one rule, the part every pending query shares. */
+function pendingWhere(userId: string, ruleId?: number) {
+  return and(
+    eq(mailboxes.clerkUserId, userId),
+    isNull(messages.movedAt),
+    ruleId === undefined ? undefined : eq(blocklist.id, ruleId)
+  );
+}
+
+/**
+ * How many messages Apply would move. Counted distinct: a message matched by
+ * both an address rule and a pattern is one message, so summing the per-rule
+ * counts would overstate it.
+ */
+export function pendingCountForUser(userId: string): number {
+  return (
+    db
+      .select({ n: countDistinct(messages.id) })
+      .from(messages)
+      .innerJoin(mailboxes, eq(mailboxes.id, messages.mailboxId))
+      .innerJoin(blocklist, and(eq(blocklist.clerkUserId, mailboxes.clerkUserId), matchesRule))
+      .where(pendingWhere(userId))
+      .get()?.n ?? 0
+  );
+}
+
+/** The messages Apply would move, newest first — every rule, or just one. */
+export function pendingForUser(userId: string, ruleId?: number) {
+  return db
+    .selectDistinct({
+      mailboxId: messages.mailboxId,
+      mailboxEmail: mailboxes.email,
+      uid: messages.uid,
+      subject: messages.subject,
+      fromAddress: messages.fromAddress,
+      date: messages.date,
+    })
+    .from(messages)
+    .innerJoin(mailboxes, eq(mailboxes.id, messages.mailboxId))
+    .innerJoin(blocklist, and(eq(blocklist.clerkUserId, mailboxes.clerkUserId), matchesRule))
+    .where(pendingWhere(userId, ruleId))
+    .orderBy(desc(messages.date))
+    .all();
+}
+
+export function ruleForUser(userId: string, id: number) {
+  return db
+    .select({ id: blocklist.id, kind: blocklist.kind, value: blocklist.value })
+    .from(blocklist)
+    .where(and(eq(blocklist.id, id), eq(blocklist.clerkUserId, userId)))
+    .get();
 }
 
 /** Cached messages in one mailbox matching any of the user's rules. */

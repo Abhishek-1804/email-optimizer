@@ -98,7 +98,8 @@ src/app/                            routing only
   dashboard/all/page.tsx            every inbox, merged
   dashboard/filter/page.tsx         level 1: sender domains
   dashboard/filter/[domain]/…       level 2: addresses, level 3: messages
-  dashboard/blocklist/page.tsx      rules + the Apply button
+  dashboard/blocklist/page.tsx      rules, pattern entry, the Apply button
+  dashboard/blocklist/review/…      what Apply would move, all rules or one
   api/mailboxes/connect/route.ts    starts Google consent
   api/mailboxes/callback/route.ts   receives it, stores the refresh token
   sign-in|sign-up/                  Clerk catch-alls
@@ -114,8 +115,8 @@ src/features/messages/              reading mail
   types.ts
 
 src/features/filtering/             grouping and blocking
-  actions/{apply-move,block-sender,unblock-sender}.ts
-  components/{spam-filter-card,spam-filter-options,block-button,apply-move-button}.tsx
+  actions/{apply-move,block-sender,block-patterns,unblock-sender}.ts
+  components/{spam-filter-card,spam-filter-options,block-button,apply-move-button,pattern-form}.tsx
 
 src/components/ui/                  button, input, card
 src/utils/cn.ts                     clsx + tailwind-merge

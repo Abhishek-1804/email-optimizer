@@ -27,5 +27,5 @@ export async function applyMove() {
   }
 
   revalidatePath("/", "layout");
-  redirect(`/dashboard/blocklist?applied=${encodeURIComponent(message)}`);
+  redirect(`/dashboard/blocklist?notice=${encodeURIComponent(message)}`);
 }
