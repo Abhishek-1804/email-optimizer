@@ -198,30 +198,34 @@ This is enforced, not remembered — `eslint.config.mjs` runs
 The `eslint-import-resolver-typescript` setting is what makes it see through the
 `@/*` alias; without it every aliased import is invisible to the rule.
 
-**Adding a feature means adding a zone.** The cross-feature entry is per-feature,
-so a new `src/features/x` is unguarded until you add its line:
+The cross-feature zones are generated from the folders in `src/features`, so a
+new feature is guarded the moment its folder exists — no line to add:
 
 ```js
 // eslint.config.mjs
-'import/no-restricted-paths': [
-  'error',
-  {
-    zones: [
-      // features can't import from app
-      { target: './src/features', from: './src/app' },
+const features = fs.readdirSync('./src/features', { withFileTypes: true })
+  .filter((d) => d.isDirectory()).map((d) => d.name)
 
-      // shared modules can't import from features or app
-      {
-        target: ['./src/components', './src/hooks', './src/lib', './src/types', './src/utils'],
-        from: ['./src/features', './src/app'],
-      },
+zones: [
+  // features can't import from app
+  { target: './src/features', from: './src/app' },
 
-      // one entry per feature: no cross-feature imports
-      { target: './src/features/grouping', from: './src/features', except: ['./grouping'] },
-    ],
-  },
-],
+  // lib/db is private to lib: everything else goes through a lib service
+  { target: ['./src/app', './src/features', './src/components', /* …every non-lib folder */], from: './src/lib/db' },
+
+  // shared modules can't import from features or app
+  { target: ['./src/components', './src/config', './src/hooks', './src/lib', './src/types', './src/utils'],
+    from: ['./src/features', './src/app'] },
+
+  // one entry per feature: no cross-feature imports
+  ...features.map((name) => ({ target: `./src/features/${name}`, from: './src/features', except: [`./${name}`] })),
+]
 ```
+
+The same config also fails any `index.ts` under `src/` (rule 4), and any
+unawaited promise (`@typescript-eslint/no-floating-promises`) — in a server
+action or around an IMAP move, a forgotten `await` is a write that fails
+silently. Mark a deliberate fire-and-forget with `void`.
 
 ### 3. Features don't import each other
 
