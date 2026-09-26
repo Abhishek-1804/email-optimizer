@@ -87,6 +87,7 @@ export async function syncMailbox(mailboxId: string): Promise<SyncResult> {
     }
 
     messageDb.insertBatch(id, FOLDER, state.uidValidity, rows);
+    messageDb.scoreMailbox(id);
 
     return {
       email: creds.email,

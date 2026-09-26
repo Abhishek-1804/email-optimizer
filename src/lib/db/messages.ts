@@ -23,10 +23,12 @@ const domain = sql<string>`lower(substr(${messages.fromAddress}, instr(${message
  * In-Reply-To subtracts: a message in a reply chain is a conversation, which is
  * what separates people from machines on shared domains like gmail.com.
  *
- * Defined once and averaged per group, so the badge and the sort order can
- * never disagree.
+ * Too slow to run per page view — it pattern-matches every raw header block —
+ * so scoreMailbox() stores it in bulk_score at sync time, and the reads below
+ * aggregate the stored column. Still defined once, so the badge and the sort
+ * order can never disagree.
  */
-const bulkScore = sql<number>`(
+const computedScore = sql<number>`(
     (CASE WHEN ${messages.listId} IS NOT NULL THEN 3 ELSE 0 END)
   + (CASE WHEN ${messages.listUnsubscribe} IS NOT NULL THEN 3 ELSE 0 END)
   + (CASE WHEN lower(${messages.rawHeaders}) LIKE '%list-unsubscribe-post%' THEN 2 ELSE 0 END)
@@ -39,7 +41,7 @@ const bulkScore = sql<number>`(
 )`;
 
 /** Mean score across a group, rounded to one decimal. Shown on the row. */
-const avgScore = sql<number>`round(avg(${bulkScore}), 1)`;
+const avgScore = sql<number>`coalesce(round(avg(${messages.bulkScore}), 1), 0)`;
 
 /**
  * Messages in a group that look like junk. This is what the lists sort by —
@@ -47,7 +49,7 @@ const avgScore = sql<number>`round(avg(${bulkScore}), 1)`;
  * Sorting by the mean instead floats one-message senders with a perfect score
  * above a sender with 646 real ones.
  */
-const junkCount = sql<number>`coalesce(sum(CASE WHEN ${bulkScore} >= 3 THEN 1 ELSE 0 END), 0)`;
+const junkCount = sql<number>`coalesce(sum(CASE WHEN ${messages.bulkScore} >= 3 THEN 1 ELSE 0 END), 0)`;
 
 /**
  * Where a sync should resume from, and which UID generation the cache holds.
@@ -101,6 +103,24 @@ export function insertBatch(
         .run();
     }
   });
+}
+
+/**
+ * Brings bulk_score up to date for one mailbox. Writes only rows whose stored
+ * score differs from the formula: new rows (NULL) on a normal sync, and every
+ * affected row after the formula itself changes — so no migration is needed
+ * to rescore, just a sync.
+ */
+export function scoreMailbox(mailboxId: number): void {
+  db.update(messages)
+    .set({ bulkScore: computedScore })
+    .where(
+      and(
+        eq(messages.mailboxId, mailboxId),
+        sql`${messages.bulkScore} IS NOT ${computedScore}`
+      )
+    )
+    .run();
 }
 
 /** Still in the folder — moved mail is excluded from every user-facing count. */

@@ -59,6 +59,7 @@ export const messages = sqliteTable(
     // classifier output, filled by a later pass
     groupKey: text("group_key"),
     category: text("category"),
+    /** Written at sync time by scoreMailbox() in db/messages; NULL until then. */
     bulkScore: integer("bulk_score"),
 
     /** NULL means still in `folder`; set means we moved it to the safety folder. */
