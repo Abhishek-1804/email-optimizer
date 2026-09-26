@@ -37,3 +37,5 @@ npm-debug.log*
 *.swp
 
 todo.txt
+# clerk configuration (can include secrets)
+/.clerk/
