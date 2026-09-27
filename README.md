@@ -119,7 +119,6 @@ verification before public launch.
 | `just lint` | ESLint (flat config) |
 | `just db-generate` | Write a migration for whatever changed in `schema.ts` |
 | `just db-check` | Check whether `schema.ts` and `db/migrations` agree |
-| `just install-deps` | `npm install` with the pinned node |
 | `just clean` | Remove deps, lockfile, build output — keeps `data/` |
 | `just clean-data` | Drop the local database and its connected mailboxes |
 | `just clean-all` | Both of the above |

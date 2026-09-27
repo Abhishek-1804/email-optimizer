@@ -3,13 +3,12 @@
 
 set shell := ["bash", "-euo", "pipefail", "-c"]
 
-# Install npm dependencies with the pinned node.
-install-deps:
-    npm install
-
 # Everything a server needs before it starts: npm deps, and a warning if
-# schema.ts needs a new migration.
-setup: install-deps db-check
+# schema.ts needs a new migration. Run in the body, not as dependencies, so
+# npm install finishes before the check needs drizzle-kit.
+setup:
+    npm install
+    ./hack/check-schema.sh
 
 # Run the Next.js dev server.
 dev: setup
