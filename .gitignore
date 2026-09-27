@@ -1,9 +1,6 @@
 # Dependencies
 /node_modules
 
-# Self-contained toolchain downloaded by hack/install-deps.sh
-/bin
-
 # Build output
 /.next
 /out

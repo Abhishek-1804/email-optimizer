@@ -1,0 +1,5 @@
+# Pinned toolchain. mise is the one exception to "self-contained": it installs
+# these into ~/.local/share/mise and puts them on PATH inside this repo.
+[tools]
+node   = "24.19.0"   # LTS; ships npm and npx
+sqlite = "3.53.4"    # sqlite3 CLI, for inspecting data/app.db (the app uses better-sqlite3)

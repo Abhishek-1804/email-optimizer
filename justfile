@@ -1,17 +1,14 @@
-# All recipes run with bin/ on PATH, so node/npm/npx/sqlite3 resolve to the
-# self-contained toolchain (see hack/install-deps.sh), never a system install.
+# node/npm/npx/sqlite3 come from mise.toml — mise puts the pinned versions on
+# PATH inside this repo, never a system install.
 
 set shell := ["bash", "-euo", "pipefail", "-c"]
 
-bin_dir := justfile_directory() + "/bin"
-export PATH := bin_dir + ":" + env_var('PATH')
-
-# Download the pinned toolchain (node, npm, sqlite3) into bin/, then npm install.
+# Install npm dependencies with the pinned node.
 install-deps:
-    ./hack/install-deps.sh
+    npm install
 
-# Everything a server needs before it starts: the toolchain, npm deps, and a
-# warning if schema.ts needs a new migration.
+# Everything a server needs before it starts: npm deps, and a warning if
+# schema.ts needs a new migration.
 setup: install-deps db-check
 
 # Run the Next.js dev server.
@@ -43,12 +40,11 @@ lint:
 # Deliberately leaves data/ alone: the mailboxes in it cost a Google consent
 # round trip each to restore. Use `just clean-data` when you actually mean it.
 #
-# Remove regenerable files (deps, lockfile, build output, IDE, bin).
+# Remove regenerable files (deps, lockfile, build output, IDE).
 clean:
     rm -rf node_modules .next out build coverage .vscode
     rm -f package-lock.json ./*.tsbuildinfo next-env.d.ts ./*.log
     find . -name .DS_Store -not -path "./.git/*" -delete
-    rm -rf "{{bin_dir}}"
     echo "Cleaned. Run 'just dev' to reinstall and start."
 
 # You reconnect each mailbox from the dashboard afterwards.
