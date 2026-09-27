@@ -8,7 +8,7 @@ This version has breaking changes — APIs, conventions, and file structure may 
 
 Read [CONTRIBUTING.md](CONTRIBUTING.md) before adding a feature — it defines the
 folder structure, the one-directional import rule, and why things are where they
-are. `just lint` enforces the layering, so a violation fails the build.
+are. `mise run lint` enforces the layering, so a violation fails the build.
 
 ## These are real mailboxes
 
@@ -25,8 +25,8 @@ are. `just lint` enforces the layering, so a violation fails the build.
 
 ## Schema changes
 
-`src/lib/db/schema.ts` is the source of truth. Edit it, run `just db-generate`,
-restart. Never hand-write SQL migrations or `ALTER` a live database. `just dev`
+`src/lib/db/schema.ts` is the source of truth. Edit it, run `mise run db-generate`,
+restart. Never hand-write SQL migrations or `ALTER` a live database. `mise run dev`
 warns if the schema has drifted from `db/migrations`.
 
 ## Verifying

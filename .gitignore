@@ -9,7 +9,7 @@ next-env.d.ts
 *.tsbuildinfo
 
 # Local SQLite database. Holds encrypted IMAP app passwords and cached mail —
-# never commit it. `just clean` removes it.
+# never commit it. `mise run clean-data` removes it.
 /data
 
 # Secrets

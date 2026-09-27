@@ -1,5 +1,77 @@
-# Pinned toolchain. mise is the one exception to "self-contained": it installs
-# these into ~/.local/share/mise and puts them on PATH inside this repo.
+# Pinned toolchain and every automation task (`mise run <task>`; `mise tasks`
+# to list). mise is the one exception to "self-contained": it installs the
+# tools into ~/.local/share/mise and puts them on PATH inside this repo.
 [tools]
 node   = "24.19.0"   # LTS; ships npm and npx
 sqlite = "3.53.4"    # sqlite3 CLI, for inspecting data/app.db (the app uses better-sqlite3)
+
+# Tasks run from the repo root with the tools above, under strict bash (`shell`;
+# mise's default is `sh -o errexit -c`, and a project config can't change it).
+# `depends` run in parallel; `run = [{ task = ... }]` steps run in order.
+
+# npm install must finish before the check, which needs drizzle-kit.
+[tasks.setup]
+description = "Everything a server needs before it starts: npm deps, and a warning if schema.ts needs a new migration"
+shell = "bash -euo pipefail -c"
+run = ["npm install", { task = "db-check" }]
+
+[tasks.dev]
+description = "Run the Next.js dev server"
+shell = "bash -euo pipefail -c"
+depends = ["setup"]
+run = "npm run dev"
+
+[tasks.db-generate]
+description = "Write a migration for whatever changed in src/lib/db/schema.ts"
+shell = "bash -euo pipefail -c"
+run = "npx drizzle-kit generate"
+
+[tasks.db-check]
+description = "Check whether schema.ts and db/migrations agree"
+shell = "bash -euo pipefail -c"
+run = "./hack/check-schema.sh"
+
+[tasks.build]
+description = "Production build"
+shell = "bash -euo pipefail -c"
+depends = ["setup"]
+run = "npm run build"
+
+# Useful when dev-mode styling looks wrong: this is the output that ships.
+[tasks.start]
+description = "Build, then serve it on :3000"
+shell = "bash -euo pipefail -c"
+depends = ["build"]
+run = "npm run start"
+
+[tasks.lint]
+description = "Lint with ESLint (flat config)"
+shell = "bash -euo pipefail -c"
+run = "npm run lint"
+
+# Deliberately leaves data/ alone: the mailboxes in it cost a Google consent
+# round trip each to restore. Use `mise run clean-data` when you actually mean it.
+[tasks.clean]
+description = "Remove regenerable files (deps, lockfile, build output, IDE)"
+shell = "bash -euo pipefail -c"
+run = '''
+rm -rf node_modules .next out build coverage .vscode
+rm -f package-lock.json ./*.tsbuildinfo next-env.d.ts ./*.log
+find . -name .DS_Store -not -path "./.git/*" -delete
+echo "Cleaned. Run 'mise run dev' to reinstall and start."
+'''
+
+# You reconnect each mailbox from the dashboard afterwards.
+[tasks.clean-data]
+description = "Drop the local database, connected mailboxes and all"
+shell = "bash -euo pipefail -c"
+run = '''
+rm -rf data
+echo "Local database removed. Reconnect your mailboxes from the dashboard."
+'''
+
+# In order, not as parallel `depends`: clean's `find .` would walk data/ while
+# clean-data deletes it.
+[tasks.clean-all]
+description = "Everything: regenerable files and the database"
+run = [{ task = "clean" }, { task = "clean-data" }]

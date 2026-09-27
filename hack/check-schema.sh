@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Warns when src/lib/db/schema.ts has drifted from db/migrations — i.e. you
-# edited the schema but never ran `just db-generate`.
+# edited the schema but never ran `mise run db-generate`.
 #
 # Compares outcomes, not text: applies the migrations to one throwaway database
 # and the schema to another, then diffs what SQLite ended up with.
@@ -30,6 +30,6 @@ if ! diff -q "$TMP/a.txt" "$TMP/b.txt" >/dev/null; then
   echo "⚠  schema.ts has drifted from db/migrations."
   diff "$TMP/a.txt" "$TMP/b.txt" | sed 's/^/     /' | head -20
   echo
-  echo "   Run 'just db-generate' to write the migration, then restart."
+  echo "   Run 'mise run db-generate' to write the migration, then restart."
   echo
 fi

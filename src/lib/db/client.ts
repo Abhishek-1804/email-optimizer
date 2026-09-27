@@ -49,7 +49,7 @@ const db = drizzle(sqlite, { schema });
 
 // Applies db/migrations in order, once each, tracked by drizzle in its own
 // table. Adding a column now means editing schema.ts and running
-// `just db-generate` — no more hand-written ALTER or deleting the database.
+// `mise run db-generate` — no more hand-written ALTER or deleting the database.
 migrate(db, { migrationsFolder: path.join(process.cwd(), "db", "migrations") });
 
 export default db;

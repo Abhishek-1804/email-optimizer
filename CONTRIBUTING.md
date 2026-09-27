@@ -157,11 +157,11 @@ Four things worth reading as worked examples of the rules below:
 
 ```sh
 # edit src/lib/db/schema.ts
-just db-generate      # writes db/migrations/NNNN_*.sql from the diff
-just dev              # migrate() applies it at boot
+mise run db-generate  # writes db/migrations/NNNN_*.sql from the diff
+mise run dev          # migrate() applies it at boot
 ```
 
-`just dev` warns first if the schema has drifted from the migrations. Commit the
+`mise run dev` warns first if the schema has drifted from the migrations. Commit the
 generated files — they're schema history, not build output — and treat them as
 append-only: once a migration has run anywhere, write a new one rather than
 editing it.
@@ -194,7 +194,7 @@ Follow the arrows and you can always answer "what breaks if I change this?"
 by looking rightward only.
 
 This is enforced, not remembered — `eslint.config.mjs` runs
-`import/no-restricted-paths` over `src/`, and `just lint` fails on a violation.
+`import/no-restricted-paths` over `src/`, and `mise run lint` fails on a violation.
 The `eslint-import-resolver-typescript` setting is what makes it see through the
 `@/*` alias; without it every aliased import is invisible to the rule.
 
@@ -260,7 +260,7 @@ import { groupBySender } from '@/features/grouping';                       // no
 | A pure function, no React, no I/O | `src/utils/` or the feature's `utils/` |
 | An env var | A getter in `src/config/env.ts` — never `process.env` directly. Server-only |
 | A plan or feature slug | `src/config/billing.ts` |
-| A DB table or column change | `src/lib/db/schema.ts`, then `just db-generate` |
+| A DB table or column change | `src/lib/db/schema.ts`, then `mise run db-generate` |
 | A query | `src/lib/db/<table>.ts` — never in a page or a feature |
 | A shared class string | A component in `src/components/ui/`, not a `const` you import |
 
@@ -375,7 +375,7 @@ These connect to **real mailboxes**. They are not style preferences.
 
 ## Before you commit
 
-- [ ] `just lint` and `just build` both pass
+- [ ] `mise run lint` and `mise run build` both pass
 - [ ] New code sits in a feature folder, not in `app/`
 - [ ] No cross-feature imports, no new barrel files
 - [ ] Actions check auth and scope by `clerk_user_id`
